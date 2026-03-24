@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Tools</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700;800&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <div class="container text-center">
+            <div class="hero-content">
+                <div class="lab-icon mb-3">
+                    <i class="fas fa-flask fa-3x"></i>
+                </div>
+                <h1 class="hero-title">Research <span class="accent">Tools</span></h1>
+                <p class="hero-subtitle">Herramientas de análisis científico</p>
+                <p class="copyright-text">&copy; 2026 Joaquín Castilla &mdash; Todos los derechos reservados</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tools Grid -->
+    <div class="container tools-section">
+        <h2 class="section-title text-center mb-5">Herramientas disponibles</h2>
+        <div class="row justify-content-center g-4">
+
+            <!-- Kaplan-Meier Card -->
+            <div class="col-sm-6 col-lg-4">
+                <a href="/kaplan-meier" class="tool-card-link">
+                    <div class="tool-card">
+                        <div class="tool-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3 class="tool-title">Kaplan-Meier Curves</h3>
+                        <p class="tool-description">
+                            Genera curvas de supervivencia de Kaplan-Meier a partir de tiempos de evento individuales.
+                        </p>
+                        <div class="tool-btn">
+                            Abrir herramienta <i class="fas fa-arrow-right ms-2"></i>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Coming Soon -->
+            <div class="col-sm-6 col-lg-4">
+                <div class="tool-card tool-card-coming-soon">
+                    <div class="tool-icon tool-icon-disabled">
+                        <i class="fas fa-dna"></i>
+                    </div>
+                    <h3 class="tool-title">Próximamente</h3>
+                    <p class="tool-description">
+                        Nuevas herramientas de análisis científico en desarrollo.
+                    </p>
+                    <div class="tool-btn tool-btn-disabled">
+                        En desarrollo <i class="fas fa-clock ms-2"></i>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container text-center">
+            <p>&copy; 2026 Joaquín Castilla &middot; Research Tools &middot; Todos los derechos reservados</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
