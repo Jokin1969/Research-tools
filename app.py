@@ -25,6 +25,35 @@ def parse_numbers(text):
     return numbers
 
 
+def compute_stats(data, table_rows):
+    """Compute descriptive statistics: n, mean, SD, SEM and KM median."""
+    n = len(data)
+    mean_val = sum(data) / n
+
+    if n > 1:
+        variance = sum((x - mean_val) ** 2 for x in data) / (n - 1)
+        std_val = variance ** 0.5
+        sem_val = std_val / (n ** 0.5)
+    else:
+        std_val = 0.0
+        sem_val = 0.0
+
+    # KM median: first time point where S(t) drops to <= 0.5
+    km_median = None
+    for row in table_rows:
+        if row['survival'] <= 0.5:
+            km_median = row['time']
+            break
+
+    return {
+        'n': n,
+        'mean': round(mean_val, 4),
+        'std': round(std_val, 4),
+        'sem': round(sem_val, 4),
+        'km_median': km_median
+    }
+
+
 def process_survival_data(data):
     """Process survival data and generate KM curve."""
     counter = Counter(data)
@@ -50,6 +79,8 @@ def process_survival_data(data):
         })
         animals_at_risk -= deaths
 
+    stats = compute_stats(data, table_rows)
+
     plt.figure(figsize=(10, 6))
     plt.plot(times, survivals, 'b-', linewidth=2)
     plt.scatter(times[1::2], survivals[1::2], color='blue', zorder=5)
@@ -64,11 +95,22 @@ def process_survival_data(data):
     plt.close()
     img_bytes.seek(0)
 
-    text_output = "Muertes\tTiempo\tAnimales en riesgo\tProbabilidad de supervivencia\n"
+    km_median_str = str(stats['km_median']) if stats['km_median'] is not None else 'N/D'
+    text_output = (
+        f"# Estadísticas descriptivas\n"
+        f"N\t{stats['n']}\n"
+        f"Media\t{stats['mean']:.4f}\n"
+        f"Desv. típica\t{stats['std']:.4f}\n"
+        f"SEM\t{stats['sem']:.4f}\n"
+        f"Mediana KM\t{km_median_str}\n"
+        f"\n"
+        f"# Tabla Kaplan-Meier\n"
+        f"Muertes\tTiempo\tAnimales en riesgo\tProbabilidad de supervivencia\n"
+    )
     for row in table_rows:
         text_output += f"{row['deaths']}\t{row['time']}\t{row['at_risk']}\t{row['survival']:.4f}\n"
 
-    return img_bytes, text_output, table_rows
+    return img_bytes, text_output, table_rows, stats
 
 
 @app.route('/')
@@ -96,13 +138,14 @@ def kaplan_meier():
         if not numbers:
             return jsonify({'error': 'No se encontraron números válidos en los datos introducidos.'}), 400
 
-        img_bytes, text_output, table_rows = process_survival_data(numbers)
+        img_bytes, text_output, table_rows, stats = process_survival_data(numbers)
         img_b64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
 
         return jsonify({
             'image': img_b64,
             'text_output': text_output,
-            'table': table_rows
+            'table': table_rows,
+            'stats': stats
         })
 
     except ValueError as e:
