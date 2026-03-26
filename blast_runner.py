@@ -1,13 +1,20 @@
 """
 PRNP-OrthoMiner — Motor del pipeline BLAST
-Adaptación a Python del script BASH original de Ana Rosa Cortazar (marzo 2021).
+Adaptación mejorada del script BASH original de Ana Rosa Cortazar (marzo 2021).
+
+Mejoras respecto al original:
+  - Extrae coordenadas exactas del alineamiento (qstart/qend) via -outfmt 6
+  - La extensión ±200 bp se aplica sobre coordenadas reales, no con sed fragile
+  - Selecciona el mejor hit por bitscore si hay varios contigs con alineamiento
+  - El informe de texto (_output.txt) es fiel al formato original (-outfmt 1)
+  - El FASTA de salida (_outputFA.fasta) incluye la región extendida con cabecera informativa
 
 Flujo por cada archivo .gz:
   1. Descomprimir el ensamblaje genómico
-  2. Ejecutar blastn (genoma como query, PrP como subject)
-  3. Localizar el contig con alineamiento significativo
-  4. Extraer ese contig y generar _output.txt + _outputFA.fasta
-  5. Limpiar archivos temporales
+  2. blastn -outfmt 1  -> informe legible (_output.txt)
+  3. blastn -outfmt 6  -> coordenadas precisas del mejor alineamiento
+  4. Extraer contig completo del FASTA y recortar qstart-200 .. qend+200
+  5. Guardar _outputFA.fasta y limpiar temporales
 """
 
 import os
@@ -18,19 +25,25 @@ import glob
 import queue
 import threading
 import uuid
+from pathlib import Path
 
-# -------------------------------------------------------------------
-# Registro de jobs en curso  {job_id: queue.Queue}
-# -------------------------------------------------------------------
+FLANK_BP = 200          # Nucleotídos de extensión en cada extremo
+
+# ---------------------------------------------------------------------------
+# Registro de jobs  {job_id: queue.Queue}
+# ---------------------------------------------------------------------------
 _jobs: dict = {}
 
 
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Utilidades de ficheros
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 def find_gz_files(base_path: str, species: str) -> list:
-    """Busca archivos .gz en <base_path>/<species>/ y sus subdirectorios."""
+    """
+    Busca archivos .gz en:  <base_path>/<species>/*.gz
+    y en subdirectorios directos de esa carpeta (como el original: WGS2/*/*.gz).
+    """
     species_dir = os.path.join(base_path.rstrip('/\\'), species)
     if not os.path.isdir(species_dir):
         return []
@@ -42,8 +55,8 @@ def find_gz_files(base_path: str, species: str) -> list:
 
 
 def decompress_gz(gz_path: str) -> str:
-    """Descomprime <fichero>.gz -> <fichero>. Devuelve la ruta descomprimida."""
-    out_path = gz_path[:-3]  # quita .gz
+    """Descomprime <archivo>.gz y devuelve la ruta del archivo descomprimido."""
+    out_path = gz_path[:-3]
     with gzip.open(gz_path, 'rb') as f_in:
         with open(out_path, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
@@ -57,7 +70,6 @@ def write_reference_fasta(name: str, sequence: str, path: str) -> None:
 
 
 def _cleanup(*paths):
-    """Elimina archivos temporales ignorando errores."""
     for p in paths:
         try:
             if p and os.path.exists(p):
@@ -66,53 +78,103 @@ def _cleanup(*paths):
             pass
 
 
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # BLAST
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
-def run_blastn(genome_path: str, ref_fasta: str, out_path: str) -> tuple:
+def _blastn(genome: str, ref: str, outfmt: str, out_path: str) -> tuple:
     """
-    Ejecuta: blastn -query <genoma> -subject <PrP.fa> -outfmt 1 -out <salida>
+    Ejecuta blastn con el formato indicado.
     Devuelve (returncode, stderr).
+    Lanza RuntimeError si BLAST+ no está instalado o hay timeout.
     """
-    cmd = [
-        'blastn',
-        '-query',   genome_path,
-        '-subject', ref_fasta,
-        '-outfmt',  '1',
-        '-out',     out_path
-    ]
+    cmd = ['blastn', '-query', genome, '-subject', ref,
+           '-outfmt', outfmt, '-out', out_path]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
-        return result.returncode, result.stderr
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+        return r.returncode, r.stderr
     except FileNotFoundError:
         raise RuntimeError(
-            "BLAST+ no encontrado. Instala BLAST+ y asegúrate de que "
+            "BLAST+ no encontrado. Instala NCBI BLAST+ y asegúrate de que "
             "'blastn' está en el PATH del sistema."
         )
     except subprocess.TimeoutExpired:
-        raise RuntimeError("Tiempo límite agotado ejecutando BLAST (máx. 2 horas).")
+        raise RuntimeError(
+            "Tiempo límite agotado ejecutando BLAST (máx. 2 horas)."
+        )
 
 
-# -------------------------------------------------------------------
-# Parseo de resultados y extracción de secuencia
-# -------------------------------------------------------------------
-
-def parse_and_extract(
-    blast_out: str,
-    genome_path: str,
-    output_dir: str,
-    base_name: str
-) -> bool:
+def run_blast_dual(genome: str, ref: str, txt_out: str, tab_out: str) -> tuple:
     """
-    Analiza la salida BLAST (-outfmt 1).
-    - Si hay alineamiento significativo genera _output.txt y _outputFA.fasta.
-    - Devuelve True si se encontró alineamiento, False si no.
+    Ejecuta BLAST dos veces:
+      1) -outfmt 1  -> informe de texto legible (compatible con el original)
+      2) -outfmt 6  -> tabla de coordenadas para extracción precisa
+    Devuelve (returncode, stderr) del último paso.
     """
-    with open(blast_out, 'r') as f:
+    rc, err = _blastn(genome, ref, '1', txt_out)
+    if rc != 0:
+        return rc, err
+    rc, err = _blastn(genome, ref, '6', tab_out)
+    return rc, err
+
+
+# ---------------------------------------------------------------------------
+# Parseo de salida tabular (-outfmt 6)
+# ---------------------------------------------------------------------------
+# Columnas estándar de -outfmt 6:
+#   0 qseqid  1 sseqid  2 pident  3 length  4 mismatch  5 gapopen
+#   6 qstart  7 qend    8 sstart  9 send   10 evalue   11 bitscore
+
+def best_hit_from_tabular(tab_path: str) -> dict | None:
+    """
+    Lee el fichero tabular (-outfmt 6) y devuelve el mejor alineamiento
+    (el de mayor bitscore), o None si no hay hits.
+    """
+    best = None
+    if not os.path.exists(tab_path):
+        return None
+    with open(tab_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split('\t')
+            if len(parts) < 12:
+                continue
+            hit = {
+                'qseqid':   parts[0],
+                'sseqid':   parts[1],
+                'pident':   float(parts[2]),
+                'length':   int(parts[3]),
+                'qstart':   int(parts[6]),   # 1-based
+                'qend':     int(parts[7]),   # 1-based
+                'sstart':   int(parts[8]),
+                'send':     int(parts[9]),
+                'evalue':   float(parts[10]),
+                'bitscore': float(parts[11])
+            }
+            if best is None or hit['bitscore'] > best['bitscore']:
+                best = hit
+    return best
+
+
+# ---------------------------------------------------------------------------
+# Parseo del informe de texto (-outfmt 1) para _output.txt
+# (fiel al comportamiento original del script BASH)
+# ---------------------------------------------------------------------------
+
+def extract_text_report(txt_blast: str, out_txt: str) -> bool:
+    """
+    Replica la lógica del BASH original:
+      - Localiza la línea 'Sequences producing significant alignments:'
+      - Extrae 5 líneas de cabecera (Query= incluido)
+      - Extrae la sección de alineamientos hasta el siguiente 'Query='
+      - Escribe el resultado en out_txt
+    Devuelve True si se encontró alineamiento, False si no.
+    """
+    with open(txt_blast) as f:
         lines = f.readlines()
 
-    # Buscar línea "Sequences producing significant alignments:"
     target_idx = None
     for i, line in enumerate(lines):
         if 'Sequences producing significant alignments:' in line:
@@ -122,16 +184,13 @@ def parse_and_extract(
     if target_idx is None:
         return False
 
-    # 5 líneas antes está la cabecera "Query= <contig>"
     start_idx = max(0, target_idx - 5)
 
-    # --- Generar _output.txt ---
-    out_txt = os.path.join(output_dir, base_name + '_output.txt')
-    with open(out_txt, 'w') as f:
-        # Cabecera (incluye la línea Query=)
+    with open(out_txt, 'w') as out:
+        # Cabecera (incluye línea Query=)
         for line in lines[start_idx:target_idx]:
-            f.write(line)
-        # Sección de alineamientos hasta el próximo "Query="
+            out.write(line)
+        # Sección de alineamientos hasta el siguiente bloque Query=
         writing = False
         for i, line in enumerate(lines):
             if 'Sequences producing significant alignments:' in line:
@@ -139,49 +198,110 @@ def parse_and_extract(
             if writing:
                 if line.startswith('Query=') and i > target_idx:
                     break
-                f.write(line)
-
-    # Extraer nombre del contig desde la línea Query=
-    buscar = None
-    header_line = lines[start_idx] if start_idx < len(lines) else ''
-    if 'Query= ' in header_line:
-        buscar = header_line.split('Query= ', 1)[1].strip()
-
-    # --- Generar _outputFA.fasta ---
-    out_fasta = os.path.join(output_dir, base_name + '_outputFA.fasta')
-    with open(out_fasta, 'w') as ff:
-        ff.write('>Secuencia_Extendida\n')
-        if buscar:
-            with open(genome_path, 'r') as gf:
-                in_target = False
-                for line in gf:
-                    if line.startswith('>'):
-                        if in_target:
-                            break
-                        if buscar in line:
-                            in_target = True
-                            ff.write(line)
-                    elif in_target:
-                        ff.write(line)
+                out.write(line)
 
     return True
 
 
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Extracción de secuencia FASTA con extensión de flanqueantes
+# ---------------------------------------------------------------------------
+
+def read_fasta_sequences(fasta_path: str) -> dict:
+    """
+    Lee un FASTA multi-contig y devuelve {seq_id: sequence_string}.
+    El seq_id es la primera palabra tras '>' (sin espacios ni \n).
+    """
+    seqs = {}
+    current_id = None
+    buffer = []
+    with open(fasta_path) as f:
+        for line in f:
+            line = line.rstrip()
+            if line.startswith('>'):
+                if current_id is not None:
+                    seqs[current_id] = ''.join(buffer)
+                current_id = line[1:].split()[0]   # primera palabra del header
+                buffer = []
+            else:
+                buffer.append(line)
+    if current_id is not None:
+        seqs[current_id] = ''.join(buffer)
+    return seqs
+
+
+def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str) -> bool:
+    """
+    Extrae el locus candidato de PRNP con ±FLANK_BP bp de contexto flanqueante.
+
+    Usa las coordenadas qstart/qend del mejor hit tabular (base 1).
+    Si el contig es más corto que la ventana solicitada se ajusta al extremo.
+
+    Escribe en out_fasta un FASTA con cabecera informativa:
+      >Locus_PRNP_candidato | contig=<id> | coords=<ini>-<fin> | ext=±200bp
+    """
+    seqs = read_fasta_sequences(genome_path)
+
+    # Buscar el contig que coincide con qseqid (coincidencia exacta o parcial)
+    contig_id  = hit['qseqid']
+    target_seq = seqs.get(contig_id)
+    if target_seq is None:
+        # Búsqueda parcial por si el ID fue truncado por BLAST
+        for sid, seq in seqs.items():
+            if contig_id in sid or sid in contig_id:
+                target_seq = seq
+                contig_id  = sid
+                break
+
+    if target_seq is None:
+        return False
+
+    # Convertir coordenadas BLAST (base 1) a índices Python (base 0)
+    qstart = hit['qstart'] - 1   # inclusive
+    qend   = hit['qend']         # exclusive
+    if qstart > qend:            # alineamiento en strand negativo: invertir
+        qstart, qend = qend - 1, qstart + 1
+
+    # Aplicar extensión flanqueante
+    ext_start = max(0, qstart - FLANK_BP)
+    ext_end   = min(len(target_seq), qend + FLANK_BP)
+    region    = target_seq[ext_start:ext_end]
+
+    # Formatear la secuencia en líneas de 80 caracteres (estándar FASTA)
+    fasta_lines = [region[i:i+80] for i in range(0, len(region), 80)]
+
+    header = (
+        f">Locus_PRNP_candidato | "
+        f"contig={contig_id} | "
+        f"coords={ext_start+1}-{ext_end} | "
+        f"aln_coords={hit['qstart']}-{hit['qend']} | "
+        f"pident={hit['pident']:.1f}% | "
+        f"ext=±{FLANK_BP}bp"
+    )
+
+    with open(out_fasta, 'w') as f:
+        f.write(header + '\n')
+        f.write('\n'.join(fasta_lines) + '\n')
+
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Pipeline completo (generador de eventos de progreso)
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path):
     """
-    Generador que ejecuta el pipeline paso a paso y emite tuplas
-    (event_type, message) donde event_type es:
+    Generador que ejecuta el pipeline paso a paso.
+    Emite tuplas (event_type, message) con tipos:
       'info', 'progress', 'step', 'success', 'warning', 'error', 'done'
     """
-    yield 'info',     'Iniciando PRNP-OrthoMiner pipeline'
-    yield 'info',     f'Especie: {species}'
-    yield 'info',     f'Referencia PrP: {ref_name}'
-    yield 'info',     f'Ruta base: {base_path}'
-    yield 'info',     f'Ruta salida: {output_path}'
+    yield 'info',  'Iniciando PRNP-OrthoMiner pipeline'
+    yield 'info',  f'Especie        : {species}'
+    yield 'info',  f'Referencia PrP : {ref_name}'
+    yield 'info',  f'Ruta base      : {base_path}'
+    yield 'info',  f'Ruta salida    : {output_path}'
+    yield 'info',  f'Extensión flanq.: ±{FLANK_BP} bp'
 
     if not os.path.isdir(base_path):
         yield 'error', f'Ruta base no encontrada: {base_path}'
@@ -192,7 +312,8 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
         yield 'error', f'Sin archivos .gz en: {os.path.join(base_path, species)}'
         return
 
-    yield 'info', f'Archivos .gz encontrados: {len(gz_files)}'
+    total = len(gz_files)
+    yield 'info', f'Archivos .gz encontrados: {total}'
     os.makedirs(output_path, exist_ok=True)
 
     # Escribir FASTA de referencia
@@ -200,14 +321,15 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
     write_reference_fasta(ref_name, ref_sequence, ref_fasta)
 
     found = 0
+    no_hit = 0
     errors = 0
 
     for i, gz_file in enumerate(gz_files):
         filename  = os.path.basename(gz_file)
         base_name = filename[:-3] if filename.endswith('.gz') else filename
-        yield 'progress', f'[{i+1}/{len(gz_files)}] {filename}'
+        yield 'progress', f'[{i+1}/{total}]  {filename}'
 
-        # 1. Descomprimir
+        # 1. Descomprimir ---------------------------------------------------
         try:
             yield 'step', 'Descomprimiendo…'
             genome_path = decompress_gz(gz_file)
@@ -216,52 +338,87 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
             errors += 1
             continue
 
-        # 2. BLAST
-        blast_out = genome_path + '_outputTemp'
+        # Rutas de salida para este archivo
+        txt_blast = genome_path + '_blast_fmt1.tmp'
+        tab_blast = genome_path + '_blast_fmt6.tmp'
+        out_txt   = os.path.join(output_path, base_name + '_output.txt')
+        out_fasta = os.path.join(output_path, base_name + '_outputFA.fasta')
+
+        # 2. BLAST (x2) -----------------------------------------------------
         try:
-            yield 'step', 'Ejecutando BLAST…'
-            rc, stderr = run_blastn(genome_path, ref_fasta, blast_out)
+            yield 'step', 'Ejecutando BLAST (informe de texto + tabla de coordenadas)…'
+            rc, stderr = run_blast_dual(genome_path, ref_fasta, txt_blast, tab_blast)
             if rc != 0:
-                yield 'error', f'BLAST falló en {filename}: {stderr[:300]}'
+                yield 'error', f'BLAST falló ({filename}): {stderr[:300]}'
                 errors += 1
-                _cleanup(genome_path, blast_out)
+                _cleanup(genome_path, txt_blast, tab_blast)
                 continue
         except RuntimeError as e:
             yield 'error', str(e)
-            _cleanup(genome_path, blast_out, ref_fasta)
+            _cleanup(genome_path, txt_blast, tab_blast, ref_fasta)
             return
 
-        # 3. Parseo y extracción
+        # 3. Parseo del informe de texto ------------------------------------
         try:
-            yield 'step', 'Procesando resultados…'
-            hit = parse_and_extract(blast_out, genome_path, output_path, base_name)
-            if hit:
-                found += 1
-                yield 'success', (
-                    f'¡Alineamiento encontrado! → '
-                    f'{base_name}_output.txt  |  {base_name}_outputFA.fasta'
-                )
-            else:
-                yield 'warning', 'Sin alineamientos significativos'
+            yield 'step', 'Analizando informe de texto…'
+            has_hit = extract_text_report(txt_blast, out_txt)
         except Exception as e:
-            yield 'error', f'Error procesando {filename}: {e}'
+            yield 'error', f'Error procesando informe ({filename}): {e}'
+            has_hit = False
+
+        if not has_hit:
+            yield 'warning', 'Sin alineamientos significativos'
+            no_hit += 1
+            _cleanup(genome_path, txt_blast, tab_blast)
+            continue
+
+        # 4. Mejor hit + extracción de secuencia con flanqueantes -----------
+        try:
+            yield 'step', f'Extrayendo locus candidato (±{FLANK_BP} bp)…'
+            hit = best_hit_from_tabular(tab_blast)
+            if hit is None:
+                yield 'warning', 'No se leyeron coordenadas del output tabular; FASTA no generado.'
+                no_hit += 1
+            else:
+                ok = extract_extended_fasta(genome_path, hit, out_fasta)
+                if ok:
+                    found += 1
+                    yield 'success', (
+                        f'¡Locus PRNP encontrado! '
+                        f'contig={hit["qseqid"]} | '
+                        f'coords={hit["qstart"]}-{hit["qend"]} | '
+                        f'identidad={hit["pident"]:.1f}% | '
+                        f'e-value={hit["evalue"]}'
+                    )
+                    yield 'success', (
+                        f'  → {base_name}_output.txt   '
+                        f'  → {base_name}_outputFA.fasta'
+                    )
+                else:
+                    yield 'warning', 'No se pudo extraer la secuencia del contig del genoma.'
+                    no_hit += 1
+        except Exception as e:
+            yield 'error', f'Error extrayendo secuencia ({filename}): {e}'
             errors += 1
 
-        _cleanup(genome_path, blast_out)
+        _cleanup(genome_path, txt_blast, tab_blast)
 
+    # --- Fin del loop -------------------------------------------------------
     _cleanup(ref_fasta)
     yield 'done', (
         f'Pipeline completado — '
-        f'Encontrados: {found}/{len(gz_files)} | Errores: {errors}'
+        f'Encontrados: {found}/{total} | '
+        f'Sin hit: {no_hit}/{total} | '
+        f'Errores: {errors}/{total}'
     )
 
 
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # API pública: jobs asíncronos con cola
-# -------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 
 def start_job(base_path, species, ref_name, ref_sequence, output_path) -> str:
-    """Lanza el pipeline en un hilo background. Devuelve el job_id."""
+    """Lanza el pipeline en un hilo background y devuelve el job_id."""
     job_id = uuid.uuid4().hex[:8]
     q: queue.Queue = queue.Queue()
     _jobs[job_id] = q
@@ -275,17 +432,15 @@ def start_job(base_path, species, ref_name, ref_sequence, output_path) -> str:
         except Exception as e:
             q.put({'type': 'error', 'message': str(e)})
         finally:
-            q.put(None)  # sentinel — fin del stream
+            q.put(None)   # sentinel — fin del stream
 
     threading.Thread(target=worker, daemon=True).start()
     return job_id
 
 
 def get_job_queue(job_id: str):
-    """Devuelve la cola del job o None si no existe."""
     return _jobs.get(job_id)
 
 
 def cleanup_job(job_id: str):
-    """Elimina el job de la tabla."""
     _jobs.pop(job_id, None)
