@@ -1,17 +1,20 @@
 import os
 import io
 import re
-import json
 import base64
+import json
 from collections import Counter
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 from sequences import PRP_SEQUENCES, GROUPS_ORDER
+from blast_runner import start_job, get_job_queue, cleanup_job
 
 app = Flask(__name__)
 
+
+# ── Kaplan-Meier helpers ───────────────────────────────────────────
 
 def parse_numbers(text):
     parts = re.split(r'[,;\s\t\n\r]+', text.strip())
@@ -47,22 +50,27 @@ def compute_stats(data, table_rows):
 
 def process_survival_data(data):
     counter = Counter(data)
+    sorted_data = sorted(counter.items(), key=lambda x: x[0])
     sorted_data = [(count, value) for value, count in counter.items()]
     sorted_data.sort(key=lambda x: x[1])
-    total_animals = sum(count for count, _ in sorted_data)
-    animals_at_risk = total_animals
-    survival_probability = 1.0
+
+    total = sum(c for c, _ in sorted_data)
+    at_risk = total
+    surv = 1.0
     times = [0]
     survivals = [1.0]
     table_rows = []
+
     for deaths, time in sorted_data:
-        survival_probability *= (animals_at_risk - deaths) / animals_at_risk
+        surv *= (at_risk - deaths) / at_risk
         times.extend([time, time])
-        survivals.extend([survivals[-1], survival_probability])
+        survivals.extend([survivals[-1], surv])
         table_rows.append({'deaths': int(deaths), 'time': time,
-                           'at_risk': int(animals_at_risk), 'survival': round(survival_probability, 4)})
-        animals_at_risk -= deaths
+                           'at_risk': int(at_risk), 'survival': round(surv, 4)})
+        at_risk -= deaths
+
     stats = compute_stats(data, table_rows)
+
     plt.figure(figsize=(10, 6))
     plt.plot(times, survivals, 'b-', linewidth=2)
     plt.scatter(times[1::2], survivals[1::2], color='blue', zorder=5)
@@ -71,20 +79,26 @@ def process_survival_data(data):
     plt.ylabel('Probabilidad de supervivencia', fontsize=12)
     plt.title('Curva de Kaplan-Meier', fontsize=14)
     plt.ylim(-0.05, 1.05)
+
     img_bytes = io.BytesIO()
     plt.savefig(img_bytes, format='png', dpi=300, bbox_inches='tight')
     plt.close()
     img_bytes.seek(0)
+
     km_median_str = str(stats['km_median']) if stats['km_median'] is not None else 'N/D'
     text_output = (
         f"# Estadísticas descriptivas\nN\t{stats['n']}\nMedia\t{stats['mean']:.4f}\n"
-        f"Desv. típica\t{stats['std']:.4f}\nSEM\t{stats['sem']:.4f}\nMediana KM\t{km_median_str}\n\n"
-        f"# Tabla Kaplan-Meier\nMuertes\tTiempo\tAnimales en riesgo\tProbabilidad de supervivencia\n"
+        f"Desv. típica\t{stats['std']:.4f}\nSEM\t{stats['sem']:.4f}\n"
+        f"Mediana KM\t{km_median_str}\n\n# Tabla Kaplan-Meier\n"
+        f"Muertes\tTiempo\tAnimales en riesgo\tProbabilidad de supervivencia\n"
     )
     for row in table_rows:
         text_output += f"{row['deaths']}\t{row['time']}\t{row['at_risk']}\t{row['survival']:.4f}\n"
+
     return img_bytes, text_output, table_rows, stats
 
+
+# ── Rutas ─────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -108,12 +122,15 @@ def kaplan_meier():
             return jsonify({'error': 'No se encontraron números válidos.'}), 400
         img_bytes, text_output, table_rows, stats = process_survival_data(numbers)
         img_b64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
-        return jsonify({'image': img_b64, 'text_output': text_output, 'table': table_rows, 'stats': stats})
+        return jsonify({'image': img_b64, 'text_output': text_output,
+                        'table': table_rows, 'stats': stats})
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': f'Error inesperado: {str(e)}'}), 500
 
+
+# ── PRNP-OrthoMiner ───────────────────────────────────────────────
 
 @app.route('/prnp-orthominer')
 def prnp_orthominer():
@@ -121,6 +138,52 @@ def prnp_orthominer():
     return render_template('prnp_orthominer.html',
                            sequences_json=sequences_json,
                            groups_order=GROUPS_ORDER)
+
+
+@app.route('/prnp-orthominer/start', methods=['POST'])
+def prnp_start():
+    data = request.get_json(force=True) or {}
+    base_path    = data.get('rutaBase', '').strip()
+    species      = data.get('nombreEspecie', '').strip()
+    ref_name     = data.get('refName', '').strip()
+    ref_sequence = data.get('refSequence', '').strip()
+    output_path  = data.get('rutaSalida', base_path).strip() or base_path
+
+    if not all([base_path, species, ref_name, ref_sequence]):
+        return jsonify({'error': 'Faltan parámetros obligatorios.'}), 400
+
+    job_id = start_job(base_path, species, ref_name, ref_sequence, output_path)
+    return jsonify({'job_id': job_id})
+
+
+@app.route('/prnp-orthominer/stream/<job_id>')
+def prnp_stream(job_id):
+    q = get_job_queue(job_id)
+    if q is None:
+        return 'Job not found', 404
+
+    def generate():
+        try:
+            while True:
+                msg = q.get(timeout=120)
+                if msg is None:                    # sentinel: pipeline terminado
+                    yield f"data: {json.dumps({'type': 'closed'})}\n\n"
+                    break
+                yield f"data: {json.dumps(msg, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            cleanup_job(job_id)
+
+    return Response(
+        generate(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control':    'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection':       'keep-alive'
+        }
+    )
 
 
 if __name__ == '__main__':
