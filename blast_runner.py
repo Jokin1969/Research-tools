@@ -153,6 +153,7 @@ def best_hit_from_tabular(tab_path: str):
                 'evalue':   float(parts[10]),
                 'bitscore': float(parts[11])
             }
+            hit['strand'] = '+' if hit['sstart'] <= hit['send'] else '-'
             if best is None or hit['bitscore'] > best['bitscore']:
                 best = hit
     return best
@@ -230,15 +231,19 @@ def read_fasta_sequences(fasta_path: str) -> dict:
     return seqs
 
 
-def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str) -> bool:
+def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species: str = ''):
     """
     Extrae el locus candidato de PRNP con ±FLANK_BP bp de contexto flanqueante.
 
     Usa las coordenadas qstart/qend del mejor hit tabular (base 1).
     Si el contig es más corto que la ventana solicitada se ajusta al extremo.
 
-    Escribe en out_fasta un FASTA con cabecera informativa:
-      >Locus_PRNP_candidato | contig=<id> | coords=<ini>-<fin> | ext=±200bp
+    Formato de salida (mixed-case):
+      - Flancos (±FLANK_BP bp): minúsculas
+      - Región alineada (ORF candidato): MAYÚSCULAS
+
+    Devuelve un dict con 'fasta_content', 'genomic_info' y metadatos,
+    o None si no se pudo localizar el contig en el genoma.
     """
     seqs = read_fasta_sequences(genome_path)
 
@@ -254,7 +259,7 @@ def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str) -> bool:
                 break
 
     if target_seq is None:
-        return False
+        return None
 
     # Convertir coordenadas BLAST (base 1) a índices Python (base 0)
     qstart = hit['qstart'] - 1   # inclusive
@@ -265,25 +270,61 @@ def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str) -> bool:
     # Aplicar extensión flanqueante
     ext_start = max(0, qstart - FLANK_BP)
     ext_end   = min(len(target_seq), qend + FLANK_BP)
-    region    = target_seq[ext_start:ext_end]
 
-    # Formatear la secuencia en líneas de 80 caracteres (estándar FASTA)
-    fasta_lines = [region[i:i+80] for i in range(0, len(region), 80)]
+    # Mixed-case: flancos en minúsculas, región alineada en MAYÚSCULAS
+    upstream   = target_seq[ext_start:qstart].lower()
+    orf_region = target_seq[qstart:qend].upper()
+    downstream = target_seq[qend:ext_end].lower()
+    region     = upstream + orf_region + downstream
 
+    # Cabecera FASTA con nombre de especie
+    header_name = f"{species}_PRNP_Extended_Region" if species else "Locus_PRNP_candidato"
     header = (
-        f">Locus_PRNP_candidato | "
+        f">{header_name} | "
         f"contig={contig_id} | "
         f"coords={ext_start+1}-{ext_end} | "
         f"aln_coords={hit['qstart']}-{hit['qend']} | "
+        f"strand={hit.get('strand', '?')} | "
         f"pident={hit['pident']:.1f}% | "
-        f"ext=±{FLANK_BP}bp"
+        f"evalue={hit['evalue']} | "
+        f"ext=\u00b1{FLANK_BP}bp"
+    )
+
+    # Formatear la secuencia en líneas de 80 caracteres (estándar FASTA)
+    fasta_lines = [region[i:i+80] for i in range(0, len(region), 80)]
+    fasta_content = header + '\n' + '\n'.join(fasta_lines) + '\n'
+
+    # Información genómica para mostrar en la interfaz
+    genomic_info = (
+        f"Especie        : {species or 'Desconocida'}\n"
+        f"Scaffold/Contig: {contig_id}\n"
+        f"Regi\u00f3n extendida: {ext_start+1}\u2013{ext_end} (base 1)\n"
+        f"Regi\u00f3n ORF     : {hit['qstart']}\u2013{hit['qend']} (coords BLAST, base 1)\n"
+        f"Hebra          : {hit.get('strand', '?')}\n"
+        f"Identidad      : {hit['pident']:.1f}%\n"
+        f"E-value        : {hit['evalue']}\n"
+        f"Longitud aln.  : {hit['length']} bp\n"
+        f"Extensi\u00f3n      : \u00b1{FLANK_BP} bp\n"
+        f"Upstream (min.): {len(upstream)} bp\n"
+        f"ORF (MAY\u00daS.)  : {len(orf_region)} bp\n"
+        f"Downstream(min): {len(downstream)} bp"
     )
 
     with open(out_fasta, 'w') as f:
-        f.write(header + '\n')
-        f.write('\n'.join(fasta_lines) + '\n')
+        f.write(fasta_content)
 
-    return True
+    return {
+        'contig':        contig_id,
+        'ext_start':     ext_start + 1,
+        'ext_end':       ext_end,
+        'aln_start':     hit['qstart'],
+        'aln_end':       hit['qend'],
+        'strand':        hit.get('strand', '?'),
+        'pident':        hit['pident'],
+        'evalue':        hit['evalue'],
+        'fasta_content': fasta_content,
+        'genomic_info':  genomic_info
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -380,8 +421,8 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
                 yield 'warning', 'No se leyeron coordenadas del output tabular; FASTA no generado.'
                 no_hit += 1
             else:
-                ok = extract_extended_fasta(genome_path, hit, out_fasta)
-                if ok:
+                result = extract_extended_fasta(genome_path, hit, out_fasta, species)
+                if result:
                     found += 1
                     yield 'success', (
                         f'¡Locus PRNP encontrado! '
@@ -394,6 +435,12 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
                         f'  → {base_name}_output.txt   '
                         f'  → {base_name}_outputFA.fasta'
                     )
+                    yield 'result', {
+                        'species':       species,
+                        'genome_file':   base_name,
+                        'fasta_content': result['fasta_content'],
+                        'genomic_info':  result['genomic_info']
+                    }
                 else:
                     yield 'warning', 'No se pudo extraer la secuencia del contig del genoma.'
                     no_hit += 1

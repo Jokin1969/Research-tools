@@ -40,6 +40,19 @@
         .status-error   { background:#fed7d7; color:#742a2a; }
         .pulse { animation: pulse-anim 1.2s infinite; }
         @keyframes pulse-anim { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        /* ── Results panel ── */
+        #resultsPanel { display:none; }
+        .result-card { border:1px solid #d6bcfa; border-radius:12px; overflow:hidden; margin-bottom:20px; }
+        .result-card-header { background:#6b46c1; color:#fff; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .result-card-header .result-title { font-weight:700; font-size:0.9rem; }
+        .result-section { padding:14px 16px; border-bottom:1px solid #e9d8fd; }
+        .result-section:last-child { border-bottom:none; }
+        .result-section-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; color:#6b46c1; letter-spacing:0.5px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; }
+        .result-textarea { font-family:'Courier New',monospace; font-size:0.78rem; color:#2d3748; background:#faf5ff; border:1px solid #d6bcfa; border-radius:6px; width:100%; resize:vertical; padding:10px; line-height:1.6; }
+        .result-textarea.seq-area { min-height:140px; }
+        .result-textarea.info-area { min-height:200px; }
+        .btn-copy-sm { font-size:0.75rem; padding:3px 10px; }
+        .no-results-msg { color:#718096; font-size:0.85rem; text-align:center; padding:20px 0; }
     </style>
 </head>
 <body>
@@ -243,6 +256,21 @@
       </div>
     </div>
 
+    <!-- Results Panel -->
+    <div id="resultsPanel" class="mt-4">
+      <div class="form-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="mb-0"><i class="fas fa-dna me-2"></i>Resultados</h4>
+          <button class="btn btn-outline-secondary btn-sm" onclick="clearResults()">
+            <i class="fas fa-trash me-1"></i>Limpiar resultados
+          </button>
+        </div>
+        <div id="resultsContainer">
+          <p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>Los resultados aparecerán aquí al terminar el análisis.</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -379,13 +407,16 @@ async function startAnalysis() {
         rutaSalida:    document.getElementById('rutaSalida').value.trim()
     };
 
-    // Mostrar panel de progreso
+    // Mostrar panel de progreso y limpiar resultados anteriores
     const panel = document.getElementById('progressPanel');
     panel.style.display = 'block';
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById('logBox').innerHTML = '';
     document.getElementById('summaryBox').classList.add('d-none');
     setStatus('running', 'Ejecutando…');
+    document.getElementById('resultsPanel').style.display = 'none';
+    document.getElementById('resultsContainer').innerHTML =
+        '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>Los resultados aparecerán aquí al terminar el análisis.</p>';
 
     const btn = document.getElementById('startBtn');
     btn.disabled = true;
@@ -410,6 +441,10 @@ async function startAnalysis() {
             if (msg.type === 'closed') {
                 currentES.close();
                 resetBtn();
+                return;
+            }
+            if (msg.type === 'result') {
+                appendResult(msg.message);
                 return;
             }
             appendLog(msg.type, msg.message);
@@ -442,7 +477,8 @@ const LOG_ICONS = {
     success:  '<i class="fas fa-check-circle"></i>',
     warning:  '<i class="fas fa-exclamation-triangle"></i>',
     error:    '<i class="fas fa-times-circle"></i>',
-    done:     '<i class="fas fa-flag-checkered"></i>'
+    done:     '<i class="fas fa-flag-checkered"></i>',
+    result:   '<i class="fas fa-dna"></i>'
 };
 
 function appendLog(type, message) {
@@ -484,6 +520,106 @@ function copyLog() {
     navigator.clipboard.writeText(lines)
         .then(() => alert('Log copiado al portapapeles.'))
         .catch(() => alert('No se pudo copiar.'));
+}
+
+// ── Results panel ──
+let resultCount = 0;
+
+function appendResult(data) {
+    resultCount++;
+    const panel = document.getElementById('resultsPanel');
+    const container = document.getElementById('resultsContainer');
+
+    // Remove placeholder text on first result
+    if (resultCount === 1) {
+        container.innerHTML = '';
+        panel.style.display = 'block';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    const cardId = `result-${resultCount}`;
+    const seqId  = `seq-${resultCount}`;
+    const infoId = `info-${resultCount}`;
+
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    card.id = cardId;
+    card.innerHTML = `
+      <div class="result-card-header">
+        <span class="result-title">
+          <i class="fas fa-dna me-2"></i>${escHtml(data.species || 'Especie desconocida')}
+          <span class="ms-2 opacity-75" style="font-weight:400;font-size:0.78rem;">${escHtml(data.genome_file)}</span>
+        </span>
+        <button class="btn btn-sm btn-light btn-copy-sm"
+                onclick="downloadFasta(${resultCount})"
+                title="Descargar FASTA">
+          <i class="fas fa-download me-1"></i>FASTA
+        </button>
+      </div>
+      <div class="result-section">
+        <div class="result-section-label">
+          <span><i class="fas fa-info-circle me-1"></i>Información genómica</span>
+          <button class="btn btn-outline-secondary btn-sm btn-copy-sm"
+                  onclick="copyField('${infoId}')">
+            <i class="fas fa-copy me-1"></i>Copiar
+          </button>
+        </div>
+        <textarea id="${infoId}" class="result-textarea info-area" readonly>${escHtml(data.genomic_info)}</textarea>
+      </div>
+      <div class="result-section">
+        <div class="result-section-label">
+          <span><i class="fas fa-align-left me-1"></i>Secuencia extendida (mayúsc.=ORF · minúsc.=flancos)</span>
+          <button class="btn btn-outline-secondary btn-sm btn-copy-sm"
+                  onclick="copyField('${seqId}')">
+            <i class="fas fa-copy me-1"></i>Copiar
+          </button>
+        </div>
+        <textarea id="${seqId}" class="result-textarea seq-area" readonly>${escHtml(data.fasta_content)}</textarea>
+      </div>`;
+    container.appendChild(card);
+
+    // Store fasta content for download
+    card.dataset.fastaContent = data.fasta_content;
+    card.dataset.species = data.species || 'PRNP';
+}
+
+function copyField(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.value)
+        .then(() => {
+            const btn = el.closest('.result-section').querySelector('.btn-copy-sm');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check me-1"></i>Copiado';
+            btn.classList.add('btn-success');
+            btn.classList.remove('btn-outline-secondary');
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-secondary');
+            }, 1800);
+        })
+        .catch(() => alert('No se pudo copiar al portapapeles.'));
+}
+
+function downloadFasta(n) {
+    const card = document.getElementById(`result-${n}`);
+    if (!card) return;
+    const content  = card.dataset.fastaContent;
+    const species  = (card.dataset.species || 'PRNP').replace(/\s+/g, '_');
+    const filename = `${species}_PRNP_extended.fasta`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function clearResults() {
+    resultCount = 0;
+    document.getElementById('resultsContainer').innerHTML =
+        '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>Los resultados aparecerán aquí al terminar el análisis.</p>';
+    document.getElementById('resultsPanel').style.display = 'none';
 }
 
 // Bootstrap tooltips
