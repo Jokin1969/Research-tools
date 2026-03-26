@@ -125,7 +125,7 @@ def run_blast_dual(genome: str, ref: str, txt_out: str, tab_out: str) -> tuple:
 #   0 qseqid  1 sseqid  2 pident  3 length  4 mismatch  5 gapopen
 #   6 qstart  7 qend    8 sstart  9 send   10 evalue   11 bitscore
 
-def best_hit_from_tabular(tab_path: str) -> dict | None:
+def best_hit_from_tabular(tab_path: str):
     """
     Lee el fichero tabular (-outfmt 6) y devuelve el mejor alineamiento
     (el de mayor bitscore), o None si no hay hits.
