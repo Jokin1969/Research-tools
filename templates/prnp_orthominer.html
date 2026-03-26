@@ -7,20 +7,18 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700;800&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
-    <!-- Page Header -->
     <div class="page-header page-header-purple">
         <div class="container">
             <a href="/" class="btn-back mb-3 d-inline-block">
                 <i class="fas fa-arrow-left"></i> Volver a Research Tools
             </a>
             <div class="d-flex align-items-center gap-3">
-                <div class="page-header-icon">
-                    <i class="fas fa-dna"></i>
-                </div>
+                <div class="page-header-icon"><i class="fas fa-dna"></i></div>
                 <div>
                     <h1 class="page-header-title">PRNP-OrthoMiner</h1>
                     <p class="page-header-subtitle mb-0">Análisis BLAST &middot; Identificación de ortólogos de PRNP &middot; Genomas de mamíferos</p>
@@ -29,11 +27,9 @@
         </div>
     </div>
 
-    <!-- Content -->
     <div class="content-area">
         <div class="container">
 
-            <!-- Info Banner -->
             <div class="info-banner info-banner-purple mb-4">
                 <i class="fas fa-info-circle flex-shrink-0 mt-1"></i>
                 <div>
@@ -52,41 +48,35 @@
                     <div class="form-card">
                         <h4><i class="fas fa-sliders-h me-2"></i>Parámetros del análisis</h4>
 
-                        <!-- Ruta base + Especie -->
                         <div class="row g-3 mb-1">
                             <div class="col-md-6">
                                 <label class="form-label" for="rutaBase">
                                     Ruta base de trabajo
-                                    <span class="tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top"
-                                        title="Directorio raíz donde están almacenadas las carpetas de genomas. Ejemplo: F:\WGS\">
+                                    <span class="tooltip-icon" data-bs-toggle="tooltip" title="Directorio raíz donde están las carpetas de genomas. Ej: F:\WGS\">
                                         <i class="fas fa-question-circle"></i>
                                     </span>
                                 </label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-folder-open"></i></span>
-                                    <input type="text" class="form-control" id="rutaBase"
-                                        placeholder="Ej: F:\WGS\" oninput="updatePaths()">
+                                    <input type="text" class="form-control" id="rutaBase" placeholder="Ej: F:\WGS\" oninput="updatePaths()">
                                 </div>
                                 <div class="help-text">Carpeta contenedora de todos los genomas.</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="nombreEspecie">
                                     Nombre de la especie
-                                    <span class="tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top"
-                                        title="Nombre de la subcarpeta correspondiente a la especie. Debe coincidir exactamente con el nombre del directorio.">
+                                    <span class="tooltip-icon" data-bs-toggle="tooltip" title="Nombre exacto de la subcarpeta de la especie objetivo.">
                                         <i class="fas fa-question-circle"></i>
                                     </span>
                                 </label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-paw"></i></span>
-                                    <input type="text" class="form-control" id="nombreEspecie"
-                                        placeholder="Ej: Myotis velifer" oninput="updatePaths()">
+                                    <input type="text" class="form-control" id="nombreEspecie" placeholder="Ej: Myotis velifer" oninput="updatePaths()">
                                 </div>
                                 <div class="help-text">Nombre del subdirectorio de la especie.</div>
                             </div>
                         </div>
 
-                        <!-- Path preview -->
                         <div class="path-preview-box" id="pathPreviewBox">
                             <span class="path-preview-label"><i class="fas fa-map-marker-alt me-1"></i>Ruta de trabajo:</span>
                             <code id="pathPreviewText" class="path-preview-value">Rellena los campos anteriores…</code>
@@ -94,119 +84,98 @@
 
                         <hr class="my-4">
 
-                        <!-- Secuencia de referencia -->
+                        <!-- Reference sequence selector -->
                         <div class="mb-3">
                             <label class="form-label" for="refPrP">
                                 Secuencia PrP de referencia
-                                <span class="tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top"
-                                    title="Secuencia de aminoacídos o nucleotídos de PrP que se usará como query en el BLAST. Se añadirán más secuencias de referencia en próximas versiones.">
+                                <span class="tooltip-icon" data-bs-toggle="tooltip" title="Secuencia query para el BLAST. Se usará para buscar el locus PRNP en el genoma objetivo.">
                                     <i class="fas fa-question-circle"></i>
                                 </span>
                             </label>
-                            <select class="form-select" id="refPrP" disabled>
-                                <option value="" selected>— Próximamente: secuencias de referencia en desarrollo —</option>
-                            </select>
+                            <select id="refPrP" placeholder="Buscar especie de referencia…"></select>
                             <div class="help-text">
-                                <i class="fas fa-wrench me-1 text-warning"></i>
-                                Las secuencias de referencia se configurarán en la siguiente etapa del desarrollo.
+                                <i class="fas fa-search me-1"></i>
+                                Escribe para filtrar entre las secuencias disponibles. Se añadirán más en próximas versiones.
                             </div>
+                        </div>
+
+                        <!-- Sequence preview -->
+                        <div class="seq-preview-box" id="seqPreviewBox">
+                            <div class="seq-preview-header">
+                                <span id="seqPreviewName"></span>
+                                <span class="seq-preview-len" id="seqPreviewLen"></span>
+                            </div>
+                            <code class="seq-preview-text" id="seqPreviewText"></code>
                         </div>
 
                         <hr class="my-4">
 
-                        <!-- Ruta de salida -->
                         <div class="mb-3">
                             <label class="form-label" for="rutaSalida">
                                 Ruta de salida
-                                <span class="tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top"
-                                    title="Directorio donde se guardarán los resultados (archivos FASTA, informe BLAST, etc.). Por defecto se usa la misma ruta base de trabajo.">
+                                <span class="tooltip-icon" data-bs-toggle="tooltip" title="Directorio donde se guardarán los resultados. Por defecto, igual a la ruta base.">
                                     <i class="fas fa-question-circle"></i>
                                 </span>
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-folder-plus"></i></span>
-                                <input type="text" class="form-control" id="rutaSalida"
-                                    placeholder="Se rellenará automáticamente con la ruta base"
-                                    oninput="markSalidaManual()">
-                                <button class="btn btn-outline-secondary" type="button" id="resetSalidaBtn"
-                                    onclick="resetSalida()" data-bs-toggle="tooltip" title="Restaurar al valor por defecto">
+                                <input type="text" class="form-control" id="rutaSalida" placeholder="Se rellenará automáticamente" oninput="markSalidaManual()">
+                                <button class="btn btn-outline-secondary" type="button" onclick="resetSalida()" data-bs-toggle="tooltip" title="Restaurar al valor por defecto">
                                     <i class="fas fa-undo"></i>
                                 </button>
                             </div>
-                            <div class="help-text">Por defecto igual a la ruta base. Editable si deseas una carpeta de resultados diferente.</div>
+                            <div class="help-text">Por defecto igual a la ruta base. Editable si quieres una carpeta de resultados diferente.</div>
                         </div>
 
-                        <!-- Validation errors -->
                         <div class="alert alert-danger d-none" id="validationAlert">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <span id="validationMsg"></span>
+                            <i class="fas fa-exclamation-triangle me-2"></i><span id="validationMsg"></span>
                         </div>
 
                         <hr class="my-4">
 
-                        <!-- Submit -->
                         <div class="d-flex align-items-center gap-3">
                             <button class="btn btn-generate btn-generate-purple" id="startBtn" onclick="validateAndStart()">
                                 <i class="fas fa-play-circle me-2"></i>Iniciar Análisis
                             </button>
                             <span class="dev-badge">
-                                <i class="fas fa-code me-1"></i>Funcionalidad en desarrollo &mdash; Etapa 2
+                                <i class="fas fa-code me-1"></i>Funcionalidad en desarrollo &mdash; Etapa 3
                             </span>
                         </div>
-
                     </div>
                 </div>
 
                 <!-- RIGHT: Pipeline info -->
                 <div class="col-lg-5">
-
                     <div class="form-card">
                         <h4><i class="fas fa-project-diagram me-2"></i>Flujo del pipeline</h4>
                         <div class="pipeline-steps">
-
                             <div class="pipeline-step">
                                 <div class="step-num">1</div>
-                                <div>
-                                    <div class="step-title">Lectura del genoma</div>
-                                    <div class="step-desc">Localiza el ensamblaje genómico en la ruta especificada (formato FASTA/FA/FNA).</div>
-                                </div>
+                                <div><div class="step-title">Lectura del genoma</div>
+                                <div class="step-desc">Localiza el ensamblaje genómico (FASTA/FA/FNA) en la ruta especificada.</div></div>
                             </div>
-
                             <div class="pipeline-step">
                                 <div class="step-num">2</div>
-                                <div>
-                                    <div class="step-title">Construcción de base de datos BLAST</div>
-                                    <div class="step-desc">Crea una base de datos BLAST local a partir del ensamblaje de la especie objetivo.</div>
-                                </div>
+                                <div><div class="step-title">Construcción de base de datos BLAST</div>
+                                <div class="step-desc">Crea una base de datos BLAST local a partir del ensamblaje objetivo.</div></div>
                             </div>
-
                             <div class="pipeline-step">
                                 <div class="step-num">3</div>
-                                <div>
-                                    <div class="step-title">Alineamiento BLAST</div>
-                                    <div class="step-desc">Ejecuta TBLASTN usando la secuencia de referencia PrP seleccionada para identificar la región genómica con mayor similitud.</div>
-                                </div>
+                                <div><div class="step-title">Alineamiento BLAST</div>
+                                <div class="step-desc">Ejecuta TBLASTN con la secuencia PrP de referencia seleccionada.</div></div>
                             </div>
-
                             <div class="pipeline-step">
                                 <div class="step-num">4</div>
-                                <div>
-                                    <div class="step-title">Extracción del locus candidato</div>
-                                    <div class="step-desc">Extrae la región genómica con contexto flanqueante para capturar el ORF completo.</div>
-                                </div>
+                                <div><div class="step-title">Extracción del locus candidato</div>
+                                <div class="step-desc">Extrae la región genómica con contexto flanqueante para capturar el ORF completo.</div></div>
                             </div>
-
                             <div class="pipeline-step pipeline-step-last">
                                 <div class="step-num">5</div>
-                                <div>
-                                    <div class="step-title">Generación de FASTA</div>
-                                    <div class="step-desc">Produce archivos FASTA con los loci candidatos de PRNP listos para anotación o análisis filogenético.</div>
-                                </div>
+                                <div><div class="step-title">Generación de FASTA</div>
+                                <div class="step-desc">Produce archivos FASTA con los loci candidatos de PRNP.</div></div>
                             </div>
-
                         </div>
                     </div>
-
                     <div class="form-card">
                         <h4><i class="fas fa-file-alt me-2"></i>Formatos admitidos</h4>
                         <ul class="formats-list">
@@ -219,7 +188,6 @@
                             Los genomas pueden descargarse de <strong>NCBI Assembly</strong> o <strong>Ensembl</strong>.
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -232,42 +200,90 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script>
-        // Init Bootstrap tooltips
-        document.addEventListener('DOMContentLoaded', () => {
-            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
-                new bootstrap.Tooltip(el, { trigger: 'hover' });
-            });
+        // Sequences data injected from Flask
+        const PRP_SEQUENCES = {{ sequences_json | safe }};
+        const GROUPS_ORDER = {{ groups_order | tojson }};
+
+        // Build tom-select options and optgroups
+        const tsOptions = [];
+        const tsOptgroups = [];
+        const groupLabels = {
+            "Roedores": "Roedores",
+            "Murciélagos": "Murciélagos",
+            "Primates": "Primates",
+            "Marsupiales": "Marsupiales",
+            "Artiodáctilos": "Artiodáctilos",
+            "Carnívoros": "Carnívoros",
+            "Lagomorfos": "Lagomorfos",
+            "Otros": "Otros"
+        };
+
+        // Create optgroups in order
+        const presentGroups = new Set(Object.values(PRP_SEQUENCES).map(s => s.group));
+        for (const g of GROUPS_ORDER) {
+            if (presentGroups.has(g)) {
+                tsOptgroups.push({ value: g, label: groupLabels[g] || g });
+            }
+        }
+
+        // Create options sorted alphabetically within each group
+        const sorted = Object.entries(PRP_SEQUENCES).sort((a, b) => a[0].localeCompare(b[0], 'es'));
+        for (const [name, data] of sorted) {
+            tsOptions.push({ value: name, text: name, optgroup: data.group });
+        }
+
+        // Init tom-select
+        const tomSelect = new TomSelect('#refPrP', {
+            options: tsOptions,
+            optgroups: tsOptgroups,
+            optgroupField: 'optgroup',
+            labelField: 'text',
+            valueField: 'value',
+            searchField: ['text'],
+            placeholder: 'Buscar especie de referencia…',
+            maxOptions: null,
+            onInitialize() {
+                this.setValue('Ratón espinoso PrP', true);
+                updateSeqPreview('Ratón espinoso PrP');
+            },
+            onChange(value) {
+                updateSeqPreview(value);
+            }
         });
 
+        function updateSeqPreview(name) {
+            if (!name || !PRP_SEQUENCES[name]) return;
+            const seq = PRP_SEQUENCES[name].sequence;
+            document.getElementById('seqPreviewName').textContent = name;
+            document.getElementById('seqPreviewLen').textContent = seq.length + ' pb';
+            document.getElementById('seqPreviewText').textContent = seq.slice(0, 100) + (seq.length > 100 ? '…' : '');
+            document.getElementById('seqPreviewBox').style.display = 'block';
+        }
+
+        // Path logic
         let salidaManuallyEdited = false;
 
         function normalizePath(p) {
-            // Ensure path ends with a separator
             p = p.trim();
             if (p && !p.endsWith('\\') && !p.endsWith('/')) {
-                // Detect separator style
-                const sep = p.includes('\\') ? '\\' : '/';
-                p = p + sep;
+                p += p.includes('\\') ? '\\' : '/';
             }
             return p;
         }
 
         function isValidPath(p) {
-            if (!p || p.trim().length === 0) return false;
-            // Accepts: Windows (C:\, F:\, \\server\), Unix (/path), relative (./)
-            return /^([A-Za-z]:[\\//]|\\\\|\/{1,2}|\.{0,2}[\\//])/.test(p.trim()) || p.trim().length > 1;
+            return p && p.trim().length > 1;
         }
 
         function updatePaths() {
             const base = document.getElementById('rutaBase').value;
             const species = document.getElementById('nombreEspecie').value.trim();
-            const previewText = document.getElementById('pathPreviewText');
-            const previewBox = document.getElementById('pathPreviewBox');
-
             const normalizedBase = normalizePath(base);
             const fullPath = normalizedBase + species;
-
+            const previewText = document.getElementById('pathPreviewText');
+            const previewBox = document.getElementById('pathPreviewBox');
             if (base.trim() || species) {
                 previewText.textContent = fullPath || '—';
                 previewBox.classList.add('path-preview-active');
@@ -275,62 +291,77 @@
                 previewText.textContent = 'Rellena los campos anteriores…';
                 previewBox.classList.remove('path-preview-active');
             }
-
-            // Auto-fill salida only if not manually edited
             if (!salidaManuallyEdited) {
                 document.getElementById('rutaSalida').value = normalizedBase;
             }
-
-            // Clear validation on input
             document.getElementById('validationAlert').classList.add('d-none');
         }
 
-        function markSalidaManual() {
-            salidaManuallyEdited = true;
-            document.getElementById('resetSalidaBtn').classList.add('btn-warning');
-        }
+        function markSalidaManual() { salidaManuallyEdited = true; }
 
         function resetSalida() {
             salidaManuallyEdited = false;
-            document.getElementById('resetSalidaBtn').classList.remove('btn-warning');
-            const base = normalizePath(document.getElementById('rutaBase').value);
-            document.getElementById('rutaSalida').value = base;
+            document.getElementById('rutaSalida').value = normalizePath(document.getElementById('rutaBase').value);
         }
 
         function validateAndStart() {
             const base = document.getElementById('rutaBase').value.trim();
             const species = document.getElementById('nombreEspecie').value.trim();
             const salida = document.getElementById('rutaSalida').value.trim();
-            const alert = document.getElementById('validationAlert');
-            const msg = document.getElementById('validationMsg');
-
-            if (!base) {
-                msg.textContent = 'La ruta base de trabajo es obligatoria.';
-                alert.classList.remove('d-none'); return;
-            }
-            if (!isValidPath(base)) {
-                msg.textContent = 'La ruta base no tiene un formato válido. Ejemplo: F:\\WGS\\ o /home/user/wgs/';
-                alert.classList.remove('d-none'); return;
-            }
-            if (!species) {
-                msg.textContent = 'El nombre de la especie es obligatorio.';
-                alert.classList.remove('d-none'); return;
-            }
-            if (!salida) {
-                msg.textContent = 'La ruta de salida es obligatoria.';
-                alert.classList.remove('d-none'); return;
-            }
-
-            // All valid — functionality coming in Stage 2
-            alert.classList.add('d-none');
+            const alertEl = document.getElementById('validationAlert');
+            const msgEl = document.getElementById('validationMsg');
+            if (!base) { msgEl.textContent = 'La ruta base de trabajo es obligatoria.'; alertEl.classList.remove('d-none'); return; }
+            if (!species) { msgEl.textContent = 'El nombre de la especie es obligatorio.'; alertEl.classList.remove('d-none'); return; }
+            if (!salida) { msgEl.textContent = 'La ruta de salida es obligatoria.'; alertEl.classList.remove('d-none'); return; }
+            alertEl.classList.add('d-none');
             const btn = document.getElementById('startBtn');
             btn.innerHTML = '<i class="fas fa-hourglass-half me-2"></i>Funcionalidad en desarrollo…';
             btn.disabled = true;
-            setTimeout(() => {
-                btn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Iniciar Análisis';
-                btn.disabled = false;
-            }, 2500);
+            setTimeout(() => { btn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Iniciar Análisis'; btn.disabled = false; }, 2500);
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+        });
     </script>
+
+    <style>
+        .seq-preview-box {
+            display: none;
+            background: #1a1a2e;
+            border: 1px solid #6b46c1;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-top: 12px;
+        }
+        .seq-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .seq-preview-header span:first-child {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #d6bcfa;
+        }
+        .seq-preview-len {
+            font-size: 0.75rem;
+            background: #6b46c1;
+            color: white;
+            border-radius: 50px;
+            padding: 2px 10px;
+            font-weight: 600;
+        }
+        .seq-preview-text {
+            display: block;
+            font-family: 'Courier New', monospace;
+            font-size: 0.78rem;
+            color: #90e0ef;
+            word-break: break-all;
+            line-height: 1.6;
+            background: none;
+        }
+    </style>
 </body>
 </html>

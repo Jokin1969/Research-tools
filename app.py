@@ -1,18 +1,19 @@
 import os
 import io
 import re
+import json
 import base64
 from collections import Counter
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from flask import Flask, render_template, request, jsonify
+from sequences import PRP_SEQUENCES, GROUPS_ORDER
 
 app = Flask(__name__)
 
 
 def parse_numbers(text):
-    """Parse numbers from text with any common separator."""
     parts = re.split(r'[,;\s\t\n\r]+', text.strip())
     numbers = []
     for part in parts:
@@ -26,7 +27,6 @@ def parse_numbers(text):
 
 
 def compute_stats(data, table_rows):
-    """Compute descriptive statistics: n, mean, SD, SEM and KM median."""
     n = len(data)
     mean_val = sum(data) / n
     if n > 1:
@@ -41,42 +41,28 @@ def compute_stats(data, table_rows):
         if row['survival'] <= 0.5:
             km_median = row['time']
             break
-    return {
-        'n': n,
-        'mean': round(mean_val, 4),
-        'std': round(std_val, 4),
-        'sem': round(sem_val, 4),
-        'km_median': km_median
-    }
+    return {'n': n, 'mean': round(mean_val, 4), 'std': round(std_val, 4),
+            'sem': round(sem_val, 4), 'km_median': km_median}
 
 
 def process_survival_data(data):
-    """Process survival data and generate KM curve."""
     counter = Counter(data)
     sorted_data = [(count, value) for value, count in counter.items()]
     sorted_data.sort(key=lambda x: x[1])
-
     total_animals = sum(count for count, _ in sorted_data)
     animals_at_risk = total_animals
     survival_probability = 1.0
     times = [0]
     survivals = [1.0]
     table_rows = []
-
     for deaths, time in sorted_data:
         survival_probability *= (animals_at_risk - deaths) / animals_at_risk
         times.extend([time, time])
         survivals.extend([survivals[-1], survival_probability])
-        table_rows.append({
-            'deaths': int(deaths),
-            'time': time,
-            'at_risk': int(animals_at_risk),
-            'survival': round(survival_probability, 4)
-        })
+        table_rows.append({'deaths': int(deaths), 'time': time,
+                           'at_risk': int(animals_at_risk), 'survival': round(survival_probability, 4)})
         animals_at_risk -= deaths
-
     stats = compute_stats(data, table_rows)
-
     plt.figure(figsize=(10, 6))
     plt.plot(times, survivals, 'b-', linewidth=2)
     plt.scatter(times[1::2], survivals[1::2], color='blue', zorder=5)
@@ -85,26 +71,18 @@ def process_survival_data(data):
     plt.ylabel('Probabilidad de supervivencia', fontsize=12)
     plt.title('Curva de Kaplan-Meier', fontsize=14)
     plt.ylim(-0.05, 1.05)
-
     img_bytes = io.BytesIO()
     plt.savefig(img_bytes, format='png', dpi=300, bbox_inches='tight')
     plt.close()
     img_bytes.seek(0)
-
     km_median_str = str(stats['km_median']) if stats['km_median'] is not None else 'N/D'
     text_output = (
-        f"# Estadísticas descriptivas\n"
-        f"N\t{stats['n']}\n"
-        f"Media\t{stats['mean']:.4f}\n"
-        f"Desv. típica\t{stats['std']:.4f}\n"
-        f"SEM\t{stats['sem']:.4f}\n"
-        f"Mediana KM\t{km_median_str}\n\n"
-        f"# Tabla Kaplan-Meier\n"
-        f"Muertes\tTiempo\tAnimales en riesgo\tProbabilidad de supervivencia\n"
+        f"# Estadísticas descriptivas\nN\t{stats['n']}\nMedia\t{stats['mean']:.4f}\n"
+        f"Desv. típica\t{stats['std']:.4f}\nSEM\t{stats['sem']:.4f}\nMediana KM\t{km_median_str}\n\n"
+        f"# Tabla Kaplan-Meier\nMuertes\tTiempo\tAnimales en riesgo\tProbabilidad de supervivencia\n"
     )
     for row in table_rows:
         text_output += f"{row['deaths']}\t{row['time']}\t{row['at_risk']}\t{row['survival']:.4f}\n"
-
     return img_bytes, text_output, table_rows, stats
 
 
@@ -139,7 +117,10 @@ def kaplan_meier():
 
 @app.route('/prnp-orthominer')
 def prnp_orthominer():
-    return render_template('prnp_orthominer.html')
+    sequences_json = json.dumps(PRP_SEQUENCES, ensure_ascii=False)
+    return render_template('prnp_orthominer.html',
+                           sequences_json=sequences_json,
+                           groups_order=GROUPS_ORDER)
 
 
 if __name__ == '__main__':
