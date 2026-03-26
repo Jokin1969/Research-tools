@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 
 def parse_numbers(text):
-    """Parse numbers from text with any common separator (comma, semicolon, space, tab, newline)."""
+    """Parse numbers from text with any common separator."""
     parts = re.split(r'[,;\s\t\n\r]+', text.strip())
     numbers = []
     for part in parts:
@@ -29,7 +29,6 @@ def compute_stats(data, table_rows):
     """Compute descriptive statistics: n, mean, SD, SEM and KM median."""
     n = len(data)
     mean_val = sum(data) / n
-
     if n > 1:
         variance = sum((x - mean_val) ** 2 for x in data) / (n - 1)
         std_val = variance ** 0.5
@@ -37,14 +36,11 @@ def compute_stats(data, table_rows):
     else:
         std_val = 0.0
         sem_val = 0.0
-
-    # KM median: first time point where S(t) drops to <= 0.5
     km_median = None
     for row in table_rows:
         if row['survival'] <= 0.5:
             km_median = row['time']
             break
-
     return {
         'n': n,
         'mean': round(mean_val, 4),
@@ -102,8 +98,7 @@ def process_survival_data(data):
         f"Media\t{stats['mean']:.4f}\n"
         f"Desv. típica\t{stats['std']:.4f}\n"
         f"SEM\t{stats['sem']:.4f}\n"
-        f"Mediana KM\t{km_median_str}\n"
-        f"\n"
+        f"Mediana KM\t{km_median_str}\n\n"
         f"# Tabla Kaplan-Meier\n"
         f"Muertes\tTiempo\tAnimales en riesgo\tProbabilidad de supervivencia\n"
     )
@@ -122,36 +117,29 @@ def index():
 def kaplan_meier():
     if request.method == 'GET':
         return render_template('kaplan_meier.html')
-
     try:
         numbers_text = ''
         if 'file' in request.files and request.files['file'].filename:
-            file = request.files['file']
-            numbers_text = file.read().decode('utf-8')
+            numbers_text = request.files['file'].read().decode('utf-8')
         else:
             numbers_text = request.form.get('numbers', '')
-
         if not numbers_text.strip():
-            return jsonify({'error': 'No se han introducido datos. Por favor, introduce los tiempos de supervivencia.'}), 400
-
+            return jsonify({'error': 'No se han introducido datos.'}), 400
         numbers = parse_numbers(numbers_text)
         if not numbers:
-            return jsonify({'error': 'No se encontraron números válidos en los datos introducidos.'}), 400
-
+            return jsonify({'error': 'No se encontraron números válidos.'}), 400
         img_bytes, text_output, table_rows, stats = process_survival_data(numbers)
         img_b64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
-
-        return jsonify({
-            'image': img_b64,
-            'text_output': text_output,
-            'table': table_rows,
-            'stats': stats
-        })
-
+        return jsonify({'image': img_b64, 'text_output': text_output, 'table': table_rows, 'stats': stats})
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': f'Error inesperado: {str(e)}'}), 500
+
+
+@app.route('/prnp-orthominer')
+def prnp_orthominer():
+    return render_template('prnp_orthominer.html')
 
 
 if __name__ == '__main__':
