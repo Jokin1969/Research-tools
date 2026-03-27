@@ -38,6 +38,9 @@ _jobs: dict = {}
 # {job_id: {'work_dir': str, 'species': str}}
 _kept_files: dict = {}
 
+# Jobs que han solicitado cancelación
+_cancel_flags: set = set()
+
 
 def get_kept_files(job_id: str):
     return _kept_files.get(job_id)
@@ -54,6 +57,11 @@ def delete_kept_files(job_id: str) -> bool:
         shutil.rmtree(entry['work_dir'], ignore_errors=True)
         return True
     return False
+
+
+def cancel_job(job_id: str):
+    """Señala al pipeline que debe detenerse en la próxima iteración."""
+    _cancel_flags.add(job_id)
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +361,7 @@ def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species:
 # Pipeline completo (generador de eventos de progreso)
 # ---------------------------------------------------------------------------
 
-def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path):
+def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path, job_id=''):
     """
     Generador que ejecuta el pipeline paso a paso.
     Emite tuplas (event_type, message) con tipos:
@@ -398,6 +406,10 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
     errors = 0
 
     for i, gz_file in enumerate(gz_files):
+        if job_id in _cancel_flags:
+            _cancel_flags.discard(job_id)
+            yield 'warning', 'Análisis cancelado por el usuario.'
+            break
         filename  = os.path.basename(gz_file)
         base_name = filename[:-3] if filename.endswith('.gz') else filename
         yield 'progress', f'[{i+1}/{total}]  {filename}'
@@ -512,7 +524,7 @@ def start_job(base_path, species, ref_name, ref_sequence, output_path,
         hit_found = False
         try:
             for etype, msg in _pipeline_generator(
-                base_path, species, ref_name, ref_sequence, output_path
+                base_path, species, ref_name, ref_sequence, output_path, job_id
             ):
                 q.put({'type': etype, 'message': msg})
                 if etype == 'result':

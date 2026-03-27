@@ -16,7 +16,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from sequences import PRP_SEQUENCES, GROUPS_ORDER
 from blast_runner import (start_job, get_job_queue, cleanup_job,
                           get_kept_files, consume_kept_files, delete_kept_files,
-                          _kept_files as kept_files_registry)
+                          cancel_job, _kept_files as kept_files_registry)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10 GB
@@ -252,6 +252,13 @@ def prnp_delete_files(job_id):
     """Borra manualmente los archivos temporales conservados tras un análisis sin hit."""
     deleted = delete_kept_files(job_id)
     return jsonify({'deleted': deleted})
+
+
+@app.route('/prnp-orthominer/cancel/<job_id>', methods=['POST'])
+def prnp_cancel(job_id):
+    """Señala al pipeline que cancele el análisis en curso."""
+    cancel_job(job_id)
+    return jsonify({'cancelled': True})
 
 
 @app.route('/prnp-orthominer/server-status')
