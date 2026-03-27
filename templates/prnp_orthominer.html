@@ -319,15 +319,20 @@ function updatePaths() {
         txt.textContent = 'Rellena los campos anteriores\u2026';
         box.classList.remove('path-preview-active');
     }
-    if (!salidaManual) document.getElementById('rutaSalida').value = norm;
+    if (!salidaManual) {
+        const fullOut = species ? normalizePath(norm + species) : norm;
+        document.getElementById('rutaSalida').value = fullOut;
+    }
     document.getElementById('validationAlert').classList.add('d-none');
 }
 
 function markSalidaManual() { salidaManual = true; }
 function resetSalida() {
     salidaManual = false;
-    document.getElementById('rutaSalida').value =
-        normalizePath(document.getElementById('rutaBase').value);
+    const base    = normalizePath(document.getElementById('rutaBase').value);
+    const species = document.getElementById('nombreEspecie').value.trim();
+    const full    = species ? normalizePath(base + species) : base;
+    document.getElementById('rutaSalida').value = full;
 }
 
 // ── Validación ──
