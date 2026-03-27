@@ -286,65 +286,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+
+<!-- ── Bloque 1: funciones UI independientes (no dependen de datos Flask) ── -->
 <script>
-// ── Datos de secuencias inyectados por Flask ──
-const PRP_SEQUENCES = {{ sequences_json | safe }};
-const GROUPS_ORDER  = {{ groups_order | tojson }};
-
-// ── Tom-Select: construir opciones y optgroups ──
-const tsOptions    = [];
-const tsOptgroups  = [];
-const seenGroups   = new Set();
-
-// Ordenar alfabeticamente dentro de cada grupo
-const sortedNames = Object.keys(PRP_SEQUENCES).sort((a, b) => a.localeCompare(b, 'es'));
-
-for (const name of sortedNames) {
-    const grp = PRP_SEQUENCES[name].group;
-    if (!seenGroups.has(grp)) {
-        seenGroups.add(grp);
-        tsOptgroups.push({ value: grp, label: grp });
-    }
-    tsOptions.push({ value: name, text: name, optgroup: grp });
-}
-
-let tomSelect;
-try {
-    tomSelect = new TomSelect('#refPrP', {
-        options:          tsOptions,
-        optgroups:        tsOptgroups,
-        optgroupField:    'optgroup',
-        labelField:       'text',
-        valueField:       'value',
-        searchField:      'text',
-        placeholder:      'Buscar secuencia PrP…',
-        create:           false,
-        allowEmptyOption: false,
-        render: {
-            no_results: () => '<div class="no-results">Sin resultados</div>'
-        }
-    });
-    // Seleccionar valor inicial de forma segura
-    const defaultKey = 'Rat\u00f3n espinoso PrP';
-    const firstKey   = tsOptions.length > 0 ? tsOptions[0].value : null;
-    tomSelect.setValue(tsOptions.find(o => o.value === defaultKey) ? defaultKey : firstKey);
-    tomSelect.on('change', updateSeqPreview);
-    updateSeqPreview();
-} catch(e) {
-    console.error('Tom-Select init error:', e);
-}
-
-function updateSeqPreview() {
-    if (!tomSelect) return;
-    const name = tomSelect.getValue();
-    const data = PRP_SEQUENCES[name];
-    if (!data) return;
-    const seq = data.sequence.replace(/\s/g, '');
-    document.getElementById('seqPreviewBases').textContent = seq.substring(0, 100) + '\u2026';
-    document.getElementById('seqMeta').textContent =
-        `Grupo: ${data.group}  |  Longitud total: ${seq.length} bp`;
-}
-
 // ── Rutas ──
 let salidaManual = false;
 
@@ -369,10 +313,10 @@ function updatePaths() {
     const box     = document.getElementById('pathPreviewBox');
     const txt     = document.getElementById('pathPreviewText');
     if (base.trim() || species) {
-        txt.textContent = full || '—';
+        txt.textContent = full || '\u2014';
         box.classList.add('path-preview-active');
     } else {
-        txt.textContent = 'Rellena los campos anteriores…';
+        txt.textContent = 'Rellena los campos anteriores\u2026';
         box.classList.remove('path-preview-active');
     }
     if (!salidaManual) document.getElementById('rutaSalida').value = norm;
@@ -395,7 +339,8 @@ function showValidationError(msg) {
 function validate() {
     const base    = document.getElementById('rutaBase').value.trim();
     const species = document.getElementById('nombreEspecie').value.trim();
-    const ref     = tomSelect ? tomSelect.getValue() : document.getElementById('refPrP').value;
+    const ref     = window.tomSelect ? window.tomSelect.getValue()
+                                     : document.getElementById('refPrP').value;
     const salida  = document.getElementById('rutaSalida').value.trim();
     if (!base)    { showValidationError('La ruta base de trabajo es obligatoria.'); return false; }
     if (!species) { showValidationError('El nombre de la especie es obligatorio.'); return false; }
@@ -405,86 +350,7 @@ function validate() {
     return true;
 }
 
-// ── Pipeline + SSE ──
-let currentES = null;
-
-async function startAnalysis() {
-    if (!validate()) return;
-
-    const refName     = tomSelect ? tomSelect.getValue() : document.getElementById('refPrP').value;
-    const refSequence = (PRP_SEQUENCES[refName]?.sequence || '').replace(/\s/g, '');
-
-    const payload = {
-        rutaBase:      document.getElementById('rutaBase').value.trim(),
-        nombreEspecie: document.getElementById('nombreEspecie').value.trim(),
-        refName,
-        refSequence,
-        rutaSalida:    document.getElementById('rutaSalida').value.trim()
-    };
-
-    // Mostrar panel de progreso y limpiar resultados anteriores
-    const panel = document.getElementById('progressPanel');
-    panel.style.display = 'block';
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    document.getElementById('logBox').innerHTML = '';
-    document.getElementById('summaryBox').classList.add('d-none');
-    setStatus('running', 'Ejecutando…');
-    document.getElementById('resultsPanel').style.display = 'none';
-    document.getElementById('resultsContainer').innerHTML =
-        '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>Los resultados aparecerán aquí al terminar el análisis.</p>';
-
-    const btn = document.getElementById('startBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Analizando…';
-
-    // Cerrar SSE anterior si existe
-    if (currentES) { currentES.close(); currentES = null; }
-
-    try {
-        const res = await fetch('/prnp-orthominer/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const { job_id, error } = await res.json();
-        if (error) { appendLog('error', error); setStatus('error', 'Error'); resetBtn(); return; }
-
-        // Conectar al stream SSE
-        currentES = new EventSource(`/prnp-orthominer/stream/${job_id}`);
-        currentES.onmessage = (e) => {
-            const msg = JSON.parse(e.data);
-            if (msg.type === 'closed') {
-                currentES.close();
-                resetBtn();
-                return;
-            }
-            if (msg.type === 'result') {
-                appendResult(msg.message);
-                return;
-            }
-            appendLog(msg.type, msg.message);
-            if (msg.type === 'done') {
-                setStatus('done', 'Completado');
-                document.getElementById('summaryText').textContent = msg.message;
-                document.getElementById('summaryBox').classList.remove('d-none');
-                currentES.close();
-                resetBtn();
-            } else if (msg.type === 'error') {
-                setStatus('error', 'Error');
-            }
-        };
-        currentES.onerror = () => {
-            appendLog('error', 'Conexión SSE interrumpida.');
-            setStatus('error', 'Error de conexión');
-            resetBtn();
-        };
-    } catch(err) {
-        appendLog('error', `Error de red: ${err}`);
-        setStatus('error', 'Error');
-        resetBtn();
-    }
-}
-
+// ── Log helpers ──
 const LOG_ICONS = {
     info:     '<i class="fas fa-info-circle"></i>',
     progress: '<i class="fas fa-arrow-right"></i>',
@@ -496,32 +362,36 @@ const LOG_ICONS = {
     result:   '<i class="fas fa-dna"></i>'
 };
 
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function appendLog(type, message) {
     const box  = document.getElementById('logBox');
     const line = document.createElement('div');
-    line.className = `log-line log-${type}`;
-    line.innerHTML = `<span class="log-icon">${LOG_ICONS[type] || ''}</span><span>${escHtml(message)}</span>`;
+    line.className = 'log-line log-' + type;
+    line.innerHTML = '<span class="log-icon">' + (LOG_ICONS[type] || '') + '</span>'
+                   + '<span>' + escHtml(message) + '</span>';
     box.appendChild(line);
     box.scrollTop = box.scrollHeight;
 }
 
-function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
 function setStatus(state, label) {
     const badge = document.getElementById('statusBadge');
-    badge.className = `status-badge status-${state}`;
-    const icons = { running: '<i class="fas fa-circle-notch fa-spin me-1"></i>',
-                    done:    '<i class="fas fa-check me-1"></i>',
-                    error:   '<i class="fas fa-times me-1"></i>' };
+    badge.className = 'status-badge status-' + state;
+    const icons = {
+        running: '<i class="fas fa-circle-notch fa-spin me-1"></i>',
+        done:    '<i class="fas fa-check me-1"></i>',
+        error:   '<i class="fas fa-times me-1"></i>'
+    };
     badge.innerHTML = (icons[state] || '') + label;
 }
 
 function resetBtn() {
     const btn = document.getElementById('startBtn');
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Iniciar Análisis';
+    btn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Iniciar An\u00e1lisis';
 }
 
 function clearLog() {
@@ -542,58 +412,51 @@ let resultCount = 0;
 
 function appendResult(data) {
     resultCount++;
-    const panel = document.getElementById('resultsPanel');
+    const panel     = document.getElementById('resultsPanel');
     const container = document.getElementById('resultsContainer');
-
-    // Remove placeholder text on first result
     if (resultCount === 1) {
         container.innerHTML = '';
         panel.style.display = 'block';
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-
-    const cardId = `result-${resultCount}`;
-    const seqId  = `seq-${resultCount}`;
-    const infoId = `info-${resultCount}`;
-
-    const card = document.createElement('div');
+    const cardId = 'result-' + resultCount;
+    const seqId  = 'seq-'    + resultCount;
+    const infoId = 'info-'   + resultCount;
+    const card   = document.createElement('div');
     card.className = 'result-card';
     card.id = cardId;
-    card.innerHTML = `
-      <div class="result-card-header">
-        <span class="result-title">
-          <i class="fas fa-dna me-2"></i>${escHtml(data.species || 'Especie desconocida')}
-          <span class="ms-2 opacity-75" style="font-weight:400;font-size:0.78rem;">${escHtml(data.genome_file)}</span>
-        </span>
-        <button class="btn btn-sm btn-light btn-copy-sm"
-                onclick="downloadFasta(${resultCount})"
-                title="Descargar FASTA">
-          <i class="fas fa-download me-1"></i>FASTA
-        </button>
-      </div>
-      <div class="result-section">
-        <div class="result-section-label">
-          <span><i class="fas fa-info-circle me-1"></i>Información genómica</span>
-          <button class="btn btn-outline-secondary btn-sm btn-copy-sm"
-                  onclick="copyField('${infoId}')">
-            <i class="fas fa-copy me-1"></i>Copiar
-          </button>
-        </div>
-        <textarea id="${infoId}" class="result-textarea info-area" readonly>${escHtml(data.genomic_info)}</textarea>
-      </div>
-      <div class="result-section">
-        <div class="result-section-label">
-          <span><i class="fas fa-align-left me-1"></i>Secuencia extendida (mayúsc.=ORF · minúsc.=flancos)</span>
-          <button class="btn btn-outline-secondary btn-sm btn-copy-sm"
-                  onclick="copyField('${seqId}')">
-            <i class="fas fa-copy me-1"></i>Copiar
-          </button>
-        </div>
-        <textarea id="${seqId}" class="result-textarea seq-area" readonly>${escHtml(data.fasta_content)}</textarea>
-      </div>`;
+    card.innerHTML =
+        '<div class="result-card-header">'
+      +   '<span class="result-title"><i class="fas fa-dna me-2"></i>'
+      +     escHtml(data.species || 'Especie desconocida')
+      +     '<span class="ms-2 opacity-75" style="font-weight:400;font-size:0.78rem;">'
+      +       escHtml(data.genome_file) + '</span></span>'
+      +   '<button class="btn btn-sm btn-light btn-copy-sm"'
+      +     ' onclick="downloadFasta(' + resultCount + ')" title="Descargar FASTA">'
+      +     '<i class="fas fa-download me-1"></i>FASTA</button>'
+      + '</div>'
+      + '<div class="result-section">'
+      +   '<div class="result-section-label">'
+      +     '<span><i class="fas fa-info-circle me-1"></i>Informaci\u00f3n gen\u00f3mica</span>'
+      +     '<button class="btn btn-outline-secondary btn-sm btn-copy-sm"'
+      +       ' onclick="copyField(\'' + infoId + '\')">'
+      +       '<i class="fas fa-copy me-1"></i>Copiar</button>'
+      +   '</div>'
+      +   '<textarea id="' + infoId + '" class="result-textarea info-area" readonly>'
+      +     escHtml(data.genomic_info) + '</textarea>'
+      + '</div>'
+      + '<div class="result-section">'
+      +   '<div class="result-section-label">'
+      +     '<span><i class="fas fa-align-left me-1"></i>'
+      +       'Secuencia extendida (may\u00fasc.=ORF \u00b7 min\u00fasc.=flancos)</span>'
+      +     '<button class="btn btn-outline-secondary btn-sm btn-copy-sm"'
+      +       ' onclick="copyField(\'' + seqId + '\')">'
+      +       '<i class="fas fa-copy me-1"></i>Copiar</button>'
+      +   '</div>'
+      +   '<textarea id="' + seqId + '" class="result-textarea seq-area" readonly>'
+      +     escHtml(data.fasta_content) + '</textarea>'
+      + '</div>';
     container.appendChild(card);
-
-    // Store fasta content for download
     card.dataset.fastaContent = data.fasta_content;
     card.dataset.species = data.species || 'PRNP';
 }
@@ -618,11 +481,11 @@ function copyField(id) {
 }
 
 function downloadFasta(n) {
-    const card = document.getElementById(`result-${n}`);
+    const card = document.getElementById('result-' + n);
     if (!card) return;
     const content  = card.dataset.fastaContent;
     const species  = (card.dataset.species || 'PRNP').replace(/\s+/g, '_');
-    const filename = `${species}_PRNP_extended.fasta`;
+    const filename = species + '_PRNP_extended.fasta';
     const blob = new Blob([content], { type: 'text/plain' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -633,8 +496,81 @@ function downloadFasta(n) {
 function clearResults() {
     resultCount = 0;
     document.getElementById('resultsContainer').innerHTML =
-        '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>Los resultados aparecerán aquí al terminar el análisis.</p>';
+        '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>'
+        + 'Los resultados aparecer\u00e1n aqu\u00ed al terminar el an\u00e1lisis.</p>';
     document.getElementById('resultsPanel').style.display = 'none';
+}
+
+// ── Pipeline + SSE ──
+let currentES = null;
+
+async function startAnalysis() {
+    if (!validate()) return;
+
+    const refName     = window.tomSelect ? window.tomSelect.getValue()
+                                         : document.getElementById('refPrP').value;
+    const seqData     = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
+    const refSequence = seqData ? seqData.sequence.replace(/\s/g, '') : '';
+
+    const payload = {
+        rutaBase:      document.getElementById('rutaBase').value.trim(),
+        nombreEspecie: document.getElementById('nombreEspecie').value.trim(),
+        refName,
+        refSequence,
+        rutaSalida:    document.getElementById('rutaSalida').value.trim()
+    };
+
+    const panel = document.getElementById('progressPanel');
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('logBox').innerHTML = '';
+    document.getElementById('summaryBox').classList.add('d-none');
+    setStatus('running', 'Ejecutando\u2026');
+    document.getElementById('resultsPanel').style.display = 'none';
+    document.getElementById('resultsContainer').innerHTML =
+        '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>'
+        + 'Los resultados aparecer\u00e1n aqu\u00ed al terminar el an\u00e1lisis.</p>';
+
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Analizando\u2026';
+
+    if (currentES) { currentES.close(); currentES = null; }
+
+    try {
+        const res = await fetch('/prnp-orthominer/start', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload)
+        });
+        const { job_id, error } = await res.json();
+        if (error) { appendLog('error', error); setStatus('error', 'Error'); resetBtn(); return; }
+
+        currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
+        currentES.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'closed') { currentES.close(); resetBtn(); return; }
+            if (msg.type === 'result') { appendResult(msg.message); return; }
+            appendLog(msg.type, msg.message);
+            if (msg.type === 'done') {
+                setStatus('done', 'Completado');
+                document.getElementById('summaryText').textContent = msg.message;
+                document.getElementById('summaryBox').classList.remove('d-none');
+                currentES.close(); resetBtn();
+            } else if (msg.type === 'error') {
+                setStatus('error', 'Error');
+            }
+        };
+        currentES.onerror = () => {
+            appendLog('error', 'Conexi\u00f3n SSE interrumpida.');
+            setStatus('error', 'Error de conexi\u00f3n');
+            resetBtn();
+        };
+    } catch(err) {
+        appendLog('error', 'Error de red: ' + err);
+        setStatus('error', 'Error');
+        resetBtn();
+    }
 }
 
 // Bootstrap tooltips
@@ -643,6 +579,63 @@ document.addEventListener('DOMContentLoaded', () => {
         el => new bootstrap.Tooltip(el, { trigger: 'hover' })
     );
 });
+</script>
+
+<!-- ── Bloque 2: datos de Flask + Tom-Select (puede fallar sin romper la UI) ── -->
+<script>
+try {
+    window.PRP_SEQUENCES = {{ sequences_json | safe }};
+    window.GROUPS_ORDER  = {{ groups_order | tojson }};
+
+    const tsOptions   = [];
+    const tsOptgroups = [];
+    const seenGroups  = new Set();
+    const sortedNames = Object.keys(window.PRP_SEQUENCES)
+                              .sort((a, b) => a.localeCompare(b, 'es'));
+
+    for (const name of sortedNames) {
+        const grp = window.PRP_SEQUENCES[name].group;
+        if (!seenGroups.has(grp)) {
+            seenGroups.add(grp);
+            tsOptgroups.push({ value: grp, label: grp });
+        }
+        tsOptions.push({ value: name, text: name, optgroup: grp });
+    }
+
+    window.tomSelect = new TomSelect('#refPrP', {
+        options:          tsOptions,
+        optgroups:        tsOptgroups,
+        optgroupField:    'optgroup',
+        labelField:       'text',
+        valueField:       'value',
+        searchField:      'text',
+        placeholder:      'Buscar secuencia PrP\u2026',
+        create:           false,
+        allowEmptyOption: false,
+        render: { no_results: () => '<div class="no-results">Sin resultados</div>' }
+    });
+
+    const defaultKey = 'Rat\u00f3n espinoso PrP';
+    const firstKey   = tsOptions.length > 0 ? tsOptions[0].value : null;
+    window.tomSelect.setValue(
+        tsOptions.find(o => o.value === defaultKey) ? defaultKey : firstKey
+    );
+    window.tomSelect.on('change', updateSeqPreview);
+    updateSeqPreview();
+} catch(e) {
+    console.error('Error cargando secuencias o Tom-Select:', e);
+}
+
+function updateSeqPreview() {
+    if (!window.tomSelect || !window.PRP_SEQUENCES) return;
+    const name = window.tomSelect.getValue();
+    const data = window.PRP_SEQUENCES[name];
+    if (!data) return;
+    const seq = data.sequence.replace(/\s/g, '');
+    document.getElementById('seqPreviewBases').textContent = seq.substring(0, 100) + '\u2026';
+    document.getElementById('seqMeta').textContent =
+        'Grupo: ' + data.group + '  |  Longitud total: ' + seq.length + ' bp';
+}
 </script>
 </body>
 </html>
