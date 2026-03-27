@@ -9,10 +9,14 @@ from collections import Counter
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_file
+from docx import Document
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from sequences import PRP_SEQUENCES, GROUPS_ORDER
 from blast_runner import (start_job, get_job_queue, cleanup_job,
-                          get_kept_files, consume_kept_files, delete_kept_files)
+                          get_kept_files, consume_kept_files, delete_kept_files,
+                          _kept_files as kept_files_registry)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10 GB
@@ -248,6 +252,108 @@ def prnp_delete_files(job_id):
     """Borra manualmente los archivos temporales conservados tras un análisis sin hit."""
     deleted = delete_kept_files(job_id)
     return jsonify({'deleted': deleted})
+
+
+@app.route('/prnp-orthominer/server-status')
+def prnp_server_status():
+    """Devuelve cuántos directorios temporales están retenidos en el servidor."""
+    entries = []
+    total_bytes = 0
+    for job_id, info in kept_files_registry.items():
+        work_dir = info.get('work_dir', '')
+        size = 0
+        if os.path.isdir(work_dir):
+            for dirpath, _, filenames in os.walk(work_dir):
+                for fn in filenames:
+                    try:
+                        size += os.path.getsize(os.path.join(dirpath, fn))
+                    except OSError:
+                        pass
+        total_bytes += size
+        entries.append({'job_id': job_id, 'species': info.get('species', '?'),
+                        'size_mb': round(size / 1024 / 1024, 1)})
+    return jsonify({'count': len(entries), 'total_mb': round(total_bytes / 1024 / 1024, 1),
+                    'entries': entries})
+
+
+@app.route('/prnp-orthominer/cleanup-all', methods=['POST'])
+def prnp_cleanup_all():
+    """Borra todos los directorios temporales retenidos."""
+    deleted = 0
+    for job_id in list(kept_files_registry.keys()):
+        if delete_kept_files(job_id):
+            deleted += 1
+    return jsonify({'deleted': deleted})
+
+
+@app.route('/prnp-orthominer/export-docx', methods=['POST'])
+def prnp_export_docx():
+    """Genera un documento Word con los resultados del análisis."""
+    data = request.get_json()
+    species   = data.get('species', 'Especie desconocida')
+    taxonomy  = data.get('taxonomy') or {}
+    results   = data.get('results', [])
+
+    doc = Document()
+
+    # Título
+    title = doc.add_heading(species, level=1)
+    title.runs[0].font.color.rgb = RGBColor(0x6b, 0x46, 0xc1)
+
+    # Taxonomía
+    if taxonomy.get('genero'):
+        doc.add_heading('Clasificación taxonómica', level=2)
+        tbl = doc.add_table(rows=3, cols=2)
+        tbl.style = 'Table Grid'
+        for i, (label, key) in enumerate([('Género', 'genero'), ('Familia', 'familia'), ('Orden', 'orden')]):
+            tbl.rows[i].cells[0].text = label
+            tbl.rows[i].cells[1].text = taxonomy.get(key, '—')
+
+    for idx, res in enumerate(results, 1):
+        doc.add_heading(f'Resultado {idx}' + (f' — {res.get("genome_file","")}' if res.get('genome_file') else ''), level=2)
+
+        # Coordenadas
+        if res.get('coords_summary'):
+            doc.add_heading('Coordenadas genómicas', level=3)
+            p = doc.add_paragraph()
+            run = p.add_run(res['coords_summary'])
+            run.font.name = 'Courier New'
+            run.font.size = Pt(9)
+
+        # Información genómica
+        if res.get('genomic_info'):
+            doc.add_heading('Información genómica', level=3)
+            p = doc.add_paragraph()
+            run = p.add_run(res['genomic_info'])
+            run.font.name = 'Courier New'
+            run.font.size = Pt(9)
+
+        # Secuencia directa
+        if res.get('fasta_direct'):
+            doc.add_heading('Secuencia extendida (directa)', level=3)
+            p = doc.add_paragraph()
+            run = p.add_run(res['fasta_direct'])
+            run.font.name = 'Courier New'
+            run.font.size = Pt(8)
+
+        # Secuencia RC
+        if res.get('fasta_rc'):
+            doc.add_heading('Secuencia extendida (reversa complementaria)', level=3)
+            p = doc.add_paragraph()
+            run = p.add_run(res['fasta_rc'])
+            run.font.name = 'Courier New'
+            run.font.size = Pt(8)
+
+        if idx < len(results):
+            doc.add_page_break()
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    safe_name = re.sub(r'[^\w\s-]', '', species).strip().replace(' ', '_') or 'resultado'
+    return send_file(buf, as_attachment=True,
+                     download_name=f'PRNP_{safe_name}.docx',
+                     mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
 
 
 if __name__ == '__main__':

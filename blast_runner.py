@@ -252,7 +252,7 @@ def read_fasta_sequences(fasta_path: str) -> dict:
     return seqs
 
 
-def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species: str = ''):
+def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species: str = '', ref_name: str = ''):
     """
     Extrae el locus candidato de PRNP con ±FLANK_BP bp de contexto flanqueante.
 
@@ -316,13 +316,14 @@ def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species:
     fasta_content = header + '\n' + '\n'.join(fasta_lines) + '\n'
 
     # Información genómica para mostrar en la interfaz
+    ref_line = f"\nReferencia PrP : {ref_name}" if ref_name else ""
     genomic_info = (
         f"Especie        : {species or 'Desconocida'}\n"
         f"Scaffold/Contig: {contig_id}\n"
         f"Regi\u00f3n extendida: {ext_start+1}\u2013{ext_end} (base 1)\n"
         f"Regi\u00f3n ORF     : {hit['qstart']}\u2013{hit['qend']} (coords BLAST, base 1)\n"
         f"Hebra          : {hit.get('strand', '?')}\n"
-        f"Identidad      : {hit['pident']:.1f}%\n"
+        f"Identidad      : {hit['pident']:.1f}%{ref_line}\n"
         f"E-value        : {hit['evalue']}\n"
         f"Longitud aln.  : {hit['length']} bp\n"
         f"Extensi\u00f3n      : \u00b1{FLANK_BP} bp\n"
@@ -452,21 +453,23 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
                 yield 'warning', 'No se leyeron coordenadas del output tabular; FASTA no generado.'
                 no_hit += 1
             else:
-                result = extract_extended_fasta(genome_path, hit, out_fasta, species)
+                result = extract_extended_fasta(genome_path, hit, out_fasta, species, ref_name)
                 if result:
                     found += 1
-                    yield 'success', (
-                        f'¡Locus PRNP encontrado! '
+                    coords_summary = (
                         f'contig={hit["qseqid"]} | '
                         f'coords={hit["qstart"]}-{hit["qend"]} | '
                         f'identidad={hit["pident"]:.1f}% | '
                         f'e-value={hit["evalue"]}'
                     )
+                    yield 'success', f'\u00a1Locus PRNP encontrado! {coords_summary}'
                     yield 'result', {
-                        'species':       species,
-                        'genome_file':   base_name,
-                        'fasta_content': result['fasta_content'],
-                        'genomic_info':  result['genomic_info']
+                        'species':        species,
+                        'genome_file':    base_name,
+                        'ref_name':       ref_name,
+                        'coords_summary': coords_summary,
+                        'fasta_content':  result['fasta_content'],
+                        'genomic_info':   result['genomic_info']
                     }
                     _cleanup(genome_path, txt_blast, tab_blast)
                     yield 'info', 'Análisis detenido: locus encontrado. Archivos temporales eliminados.'

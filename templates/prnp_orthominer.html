@@ -58,6 +58,8 @@
         .status-error   { background:#fed7d7; color:#742a2a; }
         .pulse { animation: pulse-anim 1.2s infinite; }
         @keyframes pulse-anim { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        /* ── Server status panel ── */
+        #serverStatusPanel { background:#fff8f0; border:1px solid #f6ad55; border-radius:10px; padding:10px 16px; font-size:0.82rem; }
         /* ── Retry panel ── */
         #retryPanel { display:none; }
         .retry-card { border:2px solid #f6ad55; border-radius:12px; padding:20px; background:#fffaf0; }
@@ -65,16 +67,21 @@
         /* ── Results panel ── */
         #resultsPanel { display:none; }
         .result-card { border:1px solid #d6bcfa; border-radius:12px; overflow:hidden; margin-bottom:20px; }
-        .result-card-header { background:#6b46c1; color:#fff; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .result-card-header { background:#6b46c1; color:#fff; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
         .result-card-header .result-title { font-weight:700; font-size:0.9rem; }
         .result-section { padding:14px 16px; border-bottom:1px solid #e9d8fd; }
         .result-section:last-child { border-bottom:none; }
-        .result-section-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; color:#6b46c1; letter-spacing:0.5px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; }
+        .result-section-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; color:#6b46c1; letter-spacing:0.5px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px; }
         .result-textarea { font-family:'Courier New',monospace; font-size:0.78rem; color:#2d3748; background:#faf5ff; border:1px solid #d6bcfa; border-radius:6px; width:100%; resize:vertical; padding:10px; line-height:1.6; }
         .result-textarea.seq-area { min-height:140px; }
         .result-textarea.info-area { min-height:200px; }
         .btn-copy-sm { font-size:0.75rem; padding:3px 10px; }
         .no-results-msg { color:#718096; font-size:0.85rem; text-align:center; padding:20px 0; }
+        /* RC active */
+        .btn-rc-active { background:#6b46c1 !important; color:#fff !important; border-color:#6b46c1 !important; }
+        /* ORF result */
+        .orf-result-box { background:#f0fff4; border:1px solid #9ae6b4; border-radius:6px; padding:10px 12px; font-size:0.8rem; margin-top:8px; }
+        .orf-seq { font-family:'Courier New',monospace; font-size:0.75rem; word-break:break-all; color:#22543d; }
     </style>
 </head>
 <body>
@@ -116,6 +123,20 @@
 
       <!-- LEFT: Form -->
       <div class="col-lg-7">
+
+        <!-- Panel de estado del servidor -->
+        <div id="serverStatusPanel" class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <span id="serverStatusText"><i class="fas fa-server me-1"></i>Comprobando archivos en servidor…</span>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning btn-sm" onclick="checkServerStatus()" title="Actualizar">
+              <i class="fas fa-sync-alt me-1"></i>Actualizar
+            </button>
+            <button class="btn btn-warning btn-sm" id="cleanupAllBtn" onclick="cleanupAll()" style="display:none">
+              <i class="fas fa-trash me-1"></i>Borrar todo
+            </button>
+          </div>
+        </div>
+
         <div class="form-card">
           <h4><i class="fas fa-sliders-h me-2"></i>Parámetros del análisis</h4>
 
@@ -338,14 +359,24 @@
     <!-- Results Panel -->
     <div id="resultsPanel" class="mt-4">
       <div class="form-card">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <h4 class="mb-0"><i class="fas fa-dna me-2"></i>Resultados</h4>
-          <button class="btn btn-outline-secondary btn-sm" onclick="clearResults()">
-            <i class="fas fa-trash me-1"></i>Limpiar resultados
-          </button>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-secondary btn-sm" onclick="newSpecies()" title="Reinicia el formulario sin borrar resultados">
+              <i class="fas fa-plus me-1"></i>Nueva especie
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="clearResults()">
+              <i class="fas fa-trash me-1"></i>Limpiar resultados
+            </button>
+          </div>
         </div>
         <div id="resultsContainer">
           <p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>Los resultados aparecerán aquí al terminar el análisis.</p>
+        </div>
+        <div class="mt-3 text-end" id="exportWordBtnRow" style="display:none!important">
+          <button class="btn btn-outline-primary" onclick="exportWord()">
+            <i class="fas fa-file-word me-2"></i>Exportar informe Word
+          </button>
         </div>
       </div>
     </div>
@@ -697,17 +728,20 @@ function appendResult(data) {
     resultCount++;
     const panel     = document.getElementById('resultsPanel');
     const container = document.getElementById('resultsContainer');
-    if (resultCount === 1) {
-        container.innerHTML = '';
-        panel.style.display = 'block';
-        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    const cardId = 'result-' + resultCount;
-    const seqId  = 'seq-'    + resultCount;
-    const infoId = 'info-'   + resultCount;
+    // Clear placeholder on first result; after that accumulate
+    if (container.querySelector('.no-results-msg')) container.innerHTML = '';
+    panel.style.display = 'block';
+    if (resultCount === 1) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const n      = resultCount;
+    const cardId = 'result-' + n;
+    const seqId  = 'seq-'    + n;
+    const infoId = 'info-'   + n;
+    const orfId  = 'orf-'    + n;
     const card   = document.createElement('div');
     card.className = 'result-card';
     card.id = cardId;
+
     const taxo = window.currentTaxonomy || {};
     const taxoBadges = taxo.genero
         ? '<div class="d-flex flex-wrap gap-2 px-3 py-2" style="background:#faf5ff;border-bottom:1px solid #e9d8fd;">'
@@ -719,6 +753,7 @@ function appendResult(data) {
           +   '<i class="fas fa-tree me-1"></i>' + escHtml(taxo.orden) + '</span>'
           + '</div>'
         : '';
+
     card.innerHTML =
         '<div class="result-card-header">'
       +   '<span class="result-title"><i class="fas fa-dna me-2"></i>'
@@ -726,7 +761,7 @@ function appendResult(data) {
       +     '<span class="ms-2 opacity-75" style="font-weight:400;font-size:0.78rem;">'
       +       escHtml(data.genome_file) + '</span></span>'
       +   '<button class="btn btn-sm btn-light btn-copy-sm"'
-      +     ' onclick="downloadFasta(' + resultCount + ')" title="Descargar FASTA">'
+      +     ' onclick="downloadFasta(' + n + ')" title="Descargar FASTA">'
       +     '<i class="fas fa-download me-1"></i>FASTA</button>'
       + '</div>'
       + taxoBadges
@@ -742,18 +777,39 @@ function appendResult(data) {
       + '</div>'
       + '<div class="result-section">'
       +   '<div class="result-section-label">'
-      +     '<span><i class="fas fa-align-left me-1"></i>'
+      +     '<span id="seqLabel-' + n + '"><i class="fas fa-align-left me-1"></i>'
       +       'Secuencia extendida (may\u00fasc.=ORF \u00b7 min\u00fasc.=flancos)</span>'
-      +     '<button class="btn btn-outline-secondary btn-sm btn-copy-sm"'
-      +       ' onclick="copyField(\'' + seqId + '\')">'
-      +       '<i class="fas fa-copy me-1"></i>Copiar</button>'
+      +     '<div class="d-flex gap-1 flex-wrap">'
+      +       '<button class="btn btn-outline-secondary btn-sm btn-copy-sm" id="rcBtn-' + n + '"'
+      +         ' onclick="toggleRC(' + n + ')" title="Mostrar/ocultar reversa complementaria">'
+      +         '<i class="fas fa-exchange-alt me-1"></i>RC</button>'
+      +       '<button class="btn btn-outline-info btn-sm btn-copy-sm"'
+      +         ' onclick="translateSeq(' + n + ')" title="Copiar secuencia y abrir ExPASy Translate">'
+      +         '<i class="fas fa-external-link-alt me-1"></i>Traducir</button>'
+      +       '<button class="btn btn-outline-success btn-sm btn-copy-sm"'
+      +         ' onclick="findORF(' + n + ')" title="Buscar la ORF m\u00e1s larga">'
+      +         '<i class="fas fa-search me-1"></i>Buscar ORF m\u00e1s larga</button>'
+      +       '<button class="btn btn-outline-secondary btn-sm btn-copy-sm"'
+      +         ' onclick="copyField(\'' + seqId + '\')">'
+      +         '<i class="fas fa-copy me-1"></i>Copiar</button>'
+      +     '</div>'
       +   '</div>'
       +   '<textarea id="' + seqId + '" class="result-textarea seq-area" readonly>'
       +     escHtml(data.fasta_content) + '</textarea>'
+      +   '<div id="' + orfId + '"></div>'
       + '</div>';
+
     container.appendChild(card);
-    card.dataset.fastaContent = data.fasta_content;
-    card.dataset.species = data.species || 'PRNP';
+    // Store all data for RC toggle, export, etc.
+    card.dataset.fastaContent   = data.fasta_content;
+    card.dataset.species        = data.species || 'PRNP';
+    card.dataset.coordsSummary  = data.coords_summary || '';
+    card.dataset.genomicInfo    = data.genomic_info || '';
+    card.dataset.refName        = data.ref_name || '';
+    card.dataset.rcActive       = '0';
+
+    // Show export button once we have at least one result
+    document.getElementById('exportWordBtnRow').style.cssText = '';
 }
 
 function copyField(id) {
@@ -794,6 +850,251 @@ function clearResults() {
         '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>'
         + 'Los resultados aparecer\u00e1n aqu\u00ed al terminar el an\u00e1lisis.</p>';
     document.getElementById('resultsPanel').style.display = 'none';
+    document.getElementById('exportWordBtnRow').style.display = 'none';
+}
+
+function newSpecies() {
+    // Reset form fields and files, but keep results visible
+    document.getElementById('nombreEspecie').value = '';
+    document.getElementById('rutaBase').value = '';
+    updatePathPreview();
+    hideTaxonomy();
+    selectedFiles = [];
+    renderFileList();
+    document.getElementById('summaryBox').classList.add('d-none');
+    document.getElementById('retryPanel').style.display = 'none';
+    document.getElementById('logBox').innerHTML = '';
+    document.getElementById('progressPanel').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Reverse complement ──
+function reverseComplement(seq) {
+    const comp = {'A':'T','T':'A','G':'C','C':'G','a':'t','t':'a','g':'c','c':'g','N':'N','n':'n'};
+    return seq.split('').reverse().map(b => comp[b] !== undefined ? comp[b] : b).join('');
+}
+
+function toggleRC(n) {
+    const card    = document.getElementById('result-' + n);
+    const textarea = document.getElementById('seq-' + n);
+    const btn     = document.getElementById('rcBtn-' + n);
+    const label   = document.getElementById('seqLabel-' + n);
+    if (!card || !textarea) return;
+
+    const isRC = card.dataset.rcActive === '1';
+    if (isRC) {
+        // Restore direct
+        textarea.value = card.dataset.fastaContent;
+        card.dataset.rcActive = '0';
+        btn.classList.remove('btn-rc-active');
+        btn.classList.add('btn-outline-secondary');
+        label.innerHTML = '<i class="fas fa-align-left me-1"></i>Secuencia extendida (may\u00fasc.=ORF \u00b7 min\u00fasc.=flancos)';
+    } else {
+        // Compute RC: keep header line, RC the sequence lines
+        const lines = card.dataset.fastaContent.split('\n');
+        const header = lines[0].replace(/^>/, '>RC|');
+        const seqBases = lines.slice(1).join('');
+        const rcBases  = reverseComplement(seqBases);
+        const rcLines  = [];
+        for (let i = 0; i < rcBases.length; i += 80) rcLines.push(rcBases.slice(i, i+80));
+        textarea.value = header + '\n' + rcLines.join('\n') + '\n';
+        card.dataset.rcActive = '1';
+        btn.classList.add('btn-rc-active');
+        btn.classList.remove('btn-outline-secondary');
+        label.innerHTML = '<i class="fas fa-exchange-alt me-1"></i>Secuencia extendida — <strong>REVERSA COMPLEMENTARIA</strong>';
+    }
+    // Clear ORF result if present
+    document.getElementById('orf-' + n).innerHTML = '';
+}
+
+// ── Translate (ExPASy) ──
+function translateSeq(n) {
+    const textarea = document.getElementById('seq-' + n);
+    if (!textarea) return;
+    navigator.clipboard.writeText(textarea.value)
+        .then(() => window.open('https://web.expasy.org/translate/', '_blank'))
+        .catch(() => {
+            window.open('https://web.expasy.org/translate/', '_blank');
+            alert('No se pudo copiar automáticamente. Pega la secuencia manualmente en ExPASy.');
+        });
+}
+
+// ── Find longest ORF ──
+function findLongestORF(seqRaw) {
+    const STOP = new Set(['TAA','TAG','TGA']);
+    const s = seqRaw.toUpperCase().replace(/[^ACGTN\n]/g, '').replace(/\n/g,'');
+    const compMap = {'A':'T','T':'A','G':'C','C':'G','N':'N'};
+    const rc = s.split('').reverse().map(b => compMap[b]||b).join('');
+    let best = null;
+    for (const [strand, seq] of [['+', s], ['-', rc]]) {
+        for (let frame = 0; frame < 3; frame++) {
+            let orfStart = -1;
+            for (let i = frame; i + 2 < seq.length; i += 3) {
+                const codon = seq.slice(i, i+3);
+                if (codon === 'ATG' && orfStart === -1) {
+                    orfStart = i;
+                } else if (STOP.has(codon) && orfStart !== -1) {
+                    const len = i + 3 - orfStart;
+                    if (!best || len > best.len) {
+                        best = { strand, frame: frame+1, start: orfStart+1, end: i+3,
+                                 len, seq: seq.slice(orfStart, i+3) };
+                    }
+                    orfStart = -1;
+                }
+            }
+        }
+    }
+    return best;
+}
+
+function findORF(n) {
+    const card    = document.getElementById('result-' + n);
+    const textarea = document.getElementById('seq-' + n);
+    const box     = document.getElementById('orf-' + n);
+    if (!textarea || !box) return;
+
+    // Get just sequence lines (skip FASTA header)
+    const lines = textarea.value.split('\n');
+    const seqOnly = lines.filter(l => !l.startsWith('>')).join('');
+
+    const orf = findLongestORF(seqOnly);
+    if (!orf) {
+        box.innerHTML = '<div class="orf-result-box text-muted mt-2">No se encontró ninguna ORF con cod. inicio + parada.</div>';
+        return;
+    }
+    const protein = translateDNA(orf.seq);
+    box.innerHTML =
+        '<div class="orf-result-box mt-2">'
+      + '<div class="mb-1"><strong>ORF m\u00e1s larga encontrada</strong>'
+      +   ' &nbsp;<span class="badge bg-success">' + orf.strand + ' hebra, marco ' + orf.frame + '</span></div>'
+      + '<div class="mb-1 text-muted" style="font-size:.78rem">'
+      +   'Posici\u00f3n: ' + orf.start + '\u2013' + orf.end
+      +   ' &nbsp;|&nbsp; Longitud: ' + orf.len + ' nt (' + Math.floor(orf.len/3) + ' aa)'
+      + '</div>'
+      + '<div class="mb-1"><span style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#276749;letter-spacing:.5px">Secuencia nt</span></div>'
+      + '<div class="orf-seq mb-2">' + escHtml(orf.seq) + '</div>'
+      + '<div class="mb-1"><span style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#276749;letter-spacing:.5px">Prot. traducida</span></div>'
+      + '<div class="orf-seq">' + escHtml(protein) + '</div>'
+      + '</div>';
+}
+
+function translateDNA(seq) {
+    const codons = {
+        'TTT':'F','TTC':'F','TTA':'L','TTG':'L','CTT':'L','CTC':'L','CTA':'L','CTG':'L',
+        'ATT':'I','ATC':'I','ATA':'I','ATG':'M','GTT':'V','GTC':'V','GTA':'V','GTG':'V',
+        'TCT':'S','TCC':'S','TCA':'S','TCG':'S','CCT':'P','CCC':'P','CCA':'P','CCG':'P',
+        'ACT':'T','ACC':'T','ACA':'T','ACG':'T','GCT':'A','GCC':'A','GCA':'A','GCG':'A',
+        'TAT':'Y','TAC':'Y','TAA':'*','TAG':'*','CAT':'H','CAC':'H','CAA':'Q','CAG':'Q',
+        'AAT':'N','AAC':'N','AAA':'K','AAG':'K','GAT':'D','GAC':'D','GAA':'E','GAG':'E',
+        'TGT':'C','TGC':'C','TGA':'*','TGG':'W','CGT':'R','CGC':'R','CGA':'R','CGG':'R',
+        'AGT':'S','AGC':'S','AGA':'R','AGG':'R','GGT':'G','GGC':'G','GGA':'G','GGG':'G'
+    };
+    let prot = '';
+    const s = seq.toUpperCase();
+    for (let i = 0; i + 2 < s.length; i += 3) {
+        const aa = codons[s.slice(i, i+3)] || '?';
+        if (aa === '*') { prot += '*'; break; }
+        prot += aa;
+    }
+    return prot;
+}
+
+// ── Export Word ──
+async function exportWord() {
+    const cards = document.querySelectorAll('.result-card');
+    if (!cards.length) return;
+    const species  = document.getElementById('nombreEspecie').value.trim()
+                     || (cards[0] && cards[0].dataset.species) || 'Especie';
+    const taxonomy = window.currentTaxonomy || null;
+    const results  = [];
+    cards.forEach(card => {
+        const n = card.id.replace('result-','');
+        const seqEl  = document.getElementById('seq-'  + n);
+        const rcActive = card.dataset.rcActive === '1';
+        const directFasta = card.dataset.fastaContent || '';
+        let rcFasta = '';
+        if (directFasta) {
+            const lines = directFasta.split('\n');
+            const hdr = lines[0].replace(/^>/, '>RC|');
+            const rcBases = reverseComplement(lines.slice(1).join(''));
+            const rcLines = [];
+            for (let i = 0; i < rcBases.length; i += 80) rcLines.push(rcBases.slice(i, i+80));
+            rcFasta = hdr + '\n' + rcLines.join('\n') + '\n';
+        }
+        results.push({
+            genome_file:    card.dataset.species || '',
+            ref_name:       card.dataset.refName || '',
+            coords_summary: card.dataset.coordsSummary || '',
+            genomic_info:   card.dataset.genomicInfo || '',
+            fasta_direct:   directFasta,
+            fasta_rc:       rcFasta
+        });
+    });
+
+    const btn = document.querySelector('[onclick="exportWord()"]');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Generando…';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/prnp-orthominer/export-docx', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ species, taxonomy, results })
+        });
+        if (!res.ok) throw new Error('Error del servidor');
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = 'PRNP_' + species.replace(/\s+/g,'_') + '.docx';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch(e) {
+        alert('No se pudo generar el informe: ' + e.message);
+    } finally {
+        btn.innerHTML = orig;
+        btn.disabled  = false;
+    }
+}
+
+// ── Server status ──
+async function checkServerStatus() {
+    try {
+        const res  = await fetch('/prnp-orthominer/server-status');
+        const data = await res.json();
+        const txt  = document.getElementById('serverStatusText');
+        const btn  = document.getElementById('cleanupAllBtn');
+        if (data.count === 0) {
+            txt.innerHTML = '<i class="fas fa-server me-1 text-success"></i>Servidor limpio — no hay archivos temporales retenidos.';
+            btn.style.display = 'none';
+        } else {
+            txt.innerHTML = '<i class="fas fa-server me-1 text-warning"></i>'
+                + '<strong>' + data.count + '</strong> carpeta(s) temporal(es) en el servidor'
+                + ' (' + data.total_mb + ' MB). '
+                + data.entries.map(e => '<em>' + escHtml(e.species) + '</em> ' + e.size_mb + ' MB').join(' · ');
+            btn.style.display = '';
+        }
+    } catch(e) {
+        document.getElementById('serverStatusText').innerHTML =
+            '<i class="fas fa-exclamation-triangle me-1 text-danger"></i>No se pudo consultar el estado del servidor.';
+    }
+}
+
+async function cleanupAll() {
+    if (!confirm('¿Borrar todos los archivos temporales retenidos en el servidor?')) return;
+    const btn = document.getElementById('cleanupAllBtn');
+    btn.disabled = true;
+    try {
+        const res  = await fetch('/prnp-orthominer/cleanup-all', { method: 'POST' });
+        const data = await res.json();
+        alert('Eliminadas ' + data.deleted + ' carpeta(s) temporal(es).');
+        checkServerStatus();
+    } catch(e) {
+        alert('Error al limpiar: ' + e.message);
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 // ── Retry panel ──
@@ -889,12 +1190,8 @@ async function startAnalysis() {
     document.getElementById('logBox').innerHTML = '';
     document.getElementById('summaryBox').classList.add('d-none');
     setStatus('running', 'Subiendo archivos\u2026');
-    document.getElementById('resultsPanel').style.display = 'none';
     document.getElementById('retryPanel').style.display = 'none';
-    resultCount = 0;
-    document.getElementById('resultsContainer').innerHTML =
-        '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>'
-        + 'Los resultados aparecer\u00e1n aqu\u00ed al terminar el an\u00e1lisis.</p>';
+    // NO limpiamos resultsContainer para encadenar estudios
 
     const btn = document.getElementById('startBtn');
     btn.disabled = true;
@@ -941,6 +1238,7 @@ function connectSSE(job_id) {
             document.getElementById('summaryText').textContent = msg.message;
             document.getElementById('summaryBox').classList.remove('d-none');
             currentES.close(); resetBtn();
+            checkServerStatus();  // Refresh server file count
             // Si no se encontró ningún hit, ofrecer reintento
             if (resultCount === 0) showRetryPanel(job_id);
         } else if (msg.type === 'error') {
@@ -954,11 +1252,12 @@ function connectSSE(job_id) {
     };
 }
 
-// Bootstrap tooltips
+// Bootstrap tooltips + server status on load
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(
         el => new bootstrap.Tooltip(el, { trigger: 'hover' })
     );
+    checkServerStatus();
 });
 </script>
 

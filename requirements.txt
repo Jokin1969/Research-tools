@@ -1,3 +1,4 @@
 flask==3.0.3
 matplotlib==3.9.0
 gunicorn==22.0.0
+python-docx==1.1.2
