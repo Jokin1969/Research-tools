@@ -16,6 +16,27 @@
         .ts-control:focus-within { border-color: #6b46c1 !important; box-shadow: 0 0 0 3px rgba(107,70,193,0.15) !important; }
         .ts-dropdown .option.selected, .ts-dropdown .option:hover { background: #f3e8ff !important; color: #44337a !important; }
         .ts-dropdown .optgroup-header { background: #faf5ff; color: #6b46c1; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        /* ── Upload zone ── */
+        .upload-zone { border:2px dashed #d6bcfa; border-radius:12px; padding:30px 20px; text-align:center; cursor:pointer; transition:all .2s; background:#faf5ff; }
+        .upload-zone:hover, .upload-zone.drag-over { border-color:#6b46c1; background:#f3e8ff; }
+        .upload-zone .upload-icon { font-size:2rem; color:#9f7aea; margin-bottom:8px; }
+        .upload-zone p { margin:0; color:#718096; font-size:0.88rem; }
+        .upload-zone strong { color:#6b46c1; }
+        .file-list { margin-top:10px; }
+        .file-item { display:flex; align-items:center; gap:8px; padding:6px 10px; background:#f3e8ff; border-radius:6px; margin-bottom:4px; font-size:0.82rem; }
+        .file-item .file-name { flex:1; color:#2d3748; font-family:'Courier New',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .file-item .file-size { color:#718096; flex-shrink:0; }
+        .file-item .file-remove { color:#e53e3e; cursor:pointer; flex-shrink:0; border:none; background:none; padding:0 2px; }
+        /* ── Ref mode toggle ── */
+        .btn-purple-active { background:#6b46c1; color:#fff; border-color:#6b46c1; }
+        .btn-purple-active:hover { background:#553c9a; border-color:#553c9a; color:#fff; }
+        /* ── Taxonomy panel ── */
+        #taxoPanel { border-color:#d6bcfa !important; background:#faf5ff !important; }
+        #taxoPanel strong { color:#44337a; }
+        #speciesSuggestions .dropdown-item { cursor:pointer; padding:5px 12px; }
+        #speciesSuggestions .dropdown-item:hover, #speciesSuggestions .dropdown-item.active { background:#f3e8ff; color:#44337a; }
+        #speciesSuggestions .suggest-species { font-style:italic; }
+        #speciesSuggestions .suggest-meta { font-size:.78rem; color:#718096; }
         /* ── Sequence preview ── */
         .seq-preview-box { background:#faf5ff; border:1px solid #d6bcfa; border-radius:10px; padding:14px 16px; margin-top:10px; }
         .seq-preview-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; color:#6b46c1; letter-spacing:0.5px; margin-bottom:6px; }
@@ -40,19 +61,42 @@
         .status-error   { background:#fed7d7; color:#742a2a; }
         .pulse { animation: pulse-anim 1.2s infinite; }
         @keyframes pulse-anim { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        /* ── Queue panel ── */
+        .queue-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid #e9d8fd; border-radius:8px; margin-bottom:8px; background:#faf5ff; flex-wrap:wrap; cursor:grab; user-select:none; }
+        .queue-item:active { cursor:grabbing; }
+        .queue-item.drag-over { border-color:#6b46c1; border-style:dashed; background:#f3e8ff; }
+        .queue-item.dragging  { opacity:.4; }
+        .queue-item.running { border-color:#6b46c1; background:#f3e8ff; cursor:default; }
+        .queue-item.done    { border-color:#9ae6b4; background:#f0fff4; opacity:.75; cursor:default; }
+        .queue-item.error   { border-color:#fc8181; background:#fff5f5; cursor:default; }
+        .queue-item-name  { font-weight:700; color:#2d3748; flex:1; min-width:120px; }
+        .queue-item-meta  { font-size:.78rem; color:#718096; }
+        .queue-item-status { font-size:.78rem; font-weight:600; }
+        .queue-drag-handle { color:#b794f4; font-size:.9rem; flex-shrink:0; }
+        /* ── Server status panel ── */
+        #serverStatusPanel { background:#fff8f0; border:1px solid #f6ad55; border-radius:10px; padding:10px 16px; font-size:0.82rem; }
+        /* ── Retry panel ── */
+        #retryPanel { display:none; }
+        .retry-card { border:2px solid #f6ad55; border-radius:12px; padding:20px; background:#fffaf0; }
+        .retry-card h5 { color:#c05621; font-weight:700; margin-bottom:12px; }
         /* ── Results panel ── */
         #resultsPanel { display:none; }
         .result-card { border:1px solid #d6bcfa; border-radius:12px; overflow:hidden; margin-bottom:20px; }
-        .result-card-header { background:#6b46c1; color:#fff; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .result-card-header { background:#6b46c1; color:#fff; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
         .result-card-header .result-title { font-weight:700; font-size:0.9rem; }
         .result-section { padding:14px 16px; border-bottom:1px solid #e9d8fd; }
         .result-section:last-child { border-bottom:none; }
-        .result-section-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; color:#6b46c1; letter-spacing:0.5px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; }
+        .result-section-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; color:#6b46c1; letter-spacing:0.5px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px; }
         .result-textarea { font-family:'Courier New',monospace; font-size:0.78rem; color:#2d3748; background:#faf5ff; border:1px solid #d6bcfa; border-radius:6px; width:100%; resize:vertical; padding:10px; line-height:1.6; }
         .result-textarea.seq-area { min-height:140px; }
         .result-textarea.info-area { min-height:200px; }
         .btn-copy-sm { font-size:0.75rem; padding:3px 10px; }
         .no-results-msg { color:#718096; font-size:0.85rem; text-align:center; padding:20px 0; }
+        /* RC active */
+        .btn-rc-active { background:#6b46c1 !important; color:#fff !important; border-color:#6b46c1 !important; }
+        /* ORF result */
+        .orf-result-box { background:#f0fff4; border:1px solid #9ae6b4; border-radius:6px; padding:10px 12px; font-size:0.8rem; margin-top:8px; }
+        .orf-seq { font-family:'Courier New',monospace; font-size:0.75rem; word-break:break-all; color:#22543d; }
     </style>
 </head>
 <body>
@@ -94,6 +138,20 @@
 
       <!-- LEFT: Form -->
       <div class="col-lg-7">
+
+        <!-- Panel de estado del servidor -->
+        <div id="serverStatusPanel" class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <span id="serverStatusText"><i class="fas fa-server me-1"></i>Comprobando archivos en servidor…</span>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-warning btn-sm" onclick="checkServerStatus()" title="Actualizar">
+              <i class="fas fa-sync-alt me-1"></i>Actualizar
+            </button>
+            <button class="btn btn-warning btn-sm" id="cleanupAllBtn" onclick="cleanupAll()" style="display:none">
+              <i class="fas fa-trash me-1"></i>Borrar todo
+            </button>
+          </div>
+        </div>
+
         <div class="form-card">
           <h4><i class="fas fa-sliders-h me-2"></i>Parámetros del análisis</h4>
 
@@ -103,91 +161,221 @@
               <label class="form-label" for="rutaBase">
                 Ruta base de trabajo
                 <span class="tooltip-icon" data-bs-toggle="tooltip"
-                  title="Directorio raíz donde están almacenadas las carpetas de genomas. Ej: F:\WGS\">
+                  title="Directorio raíz donde están tus genomas. Solo para referencia — úsala para navegar a esa carpeta y arrastrar los ficheros.">
                   <i class="fas fa-question-circle"></i></span>
               </label>
               <div class="input-group">
                 <button class="btn btn-outline-secondary" type="button"
-                        onclick="fillExamplePath()"
-                        title="Usar ruta de ejemplo: F:\WGS\">
+                        onclick="fillExamplePath()" title="Usar ruta de ejemplo: F:\WGS\">
                   <i class="fas fa-folder-open"></i>
                 </button>
                 <input type="text" class="form-control" id="rutaBase"
-                       placeholder="Ej: F:\WGS\" oninput="updatePaths()">
+                       placeholder="Ej: F:\WGS\" oninput="updatePathPreview()">
               </div>
-              <div class="help-text">Haz clic en <i class="fas fa-folder-open"></i> para usar <code>F:\WGS\</code> como ruta de ejemplo.</div>
             </div>
             <div class="col-md-6">
               <label class="form-label" for="nombreEspecie">
                 Nombre de la especie
                 <span class="tooltip-icon" data-bs-toggle="tooltip"
-                  title="Nombre de la subcarpeta correspondiente a la especie.">
+                  title="Escribe el nombre científico (género + especie). Se consultará la base de datos taxonómica.">
                   <i class="fas fa-question-circle"></i></span>
               </label>
               <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-paw"></i></span>
                 <input type="text" class="form-control" id="nombreEspecie"
-                       placeholder="Ej: Myotis velifer" oninput="updatePaths()">
+                       placeholder="Ej: Myotis velifer" autocomplete="off"
+                       oninput="updatePathPreview(); onSpeciesInput(this.value)">
+                <div id="speciesSuggestions" class="dropdown-menu shadow-sm"
+                     style="display:none; position:absolute; top:100%; left:0; right:0; z-index:1050; max-height:200px; overflow-y:auto; font-size:.875rem;"></div>
               </div>
-              <div class="help-text">Nombre del subdirectorio de la especie.</div>
+              <!-- Panel taxonómico -->
+              <div id="taxoPanel" class="mt-2 p-2 rounded border bg-light small" style="display:none">
+                <div class="d-flex flex-wrap gap-3">
+                  <span><i class="fas fa-sitemap me-1 text-secondary"></i><strong>Género:</strong> <span id="taxoGenero">—</span></span>
+                  <span><i class="fas fa-layer-group me-1 text-secondary"></i><strong>Familia:</strong> <span id="taxoFamilia">—</span></span>
+                  <span><i class="fas fa-tree me-1 text-secondary"></i><strong>Orden:</strong> <span id="taxoOrden">—</span></span>
+                </div>
+                <div id="taxoSuggestion" class="mt-1 text-primary" style="display:none">
+                  <i class="fas fa-lightbulb me-1"></i><span id="taxoSuggestionText"></span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Path preview -->
-          <div class="path-preview-box" id="pathPreviewBox">
+          <!-- Path preview + copiar -->
+          <div class="path-preview-box mb-3" id="pathPreviewBox">
             <span class="path-preview-label"><i class="fas fa-map-marker-alt me-1"></i>Ruta de trabajo:</span>
             <code id="pathPreviewText" class="path-preview-value">Rellena los campos anteriores…</code>
+            <button class="btn btn-outline-secondary btn-sm ms-2 py-0" id="copyPathBtn"
+                    onclick="copyPath()" title="Copiar ruta al portapapeles" style="display:none">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+
+          <!-- Archivos .gz -->
+          <div class="mb-1">
+            <label class="form-label">
+              Archivos de genoma (.gz)
+              <span class="tooltip-icon" data-bs-toggle="tooltip"
+                title="Arrastra ficheros, selecciónalos uno a uno, o carga toda la carpeta de golpe.">
+                <i class="fas fa-question-circle"></i></span>
+            </label>
+            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+              <button class="btn btn-outline-secondary btn-sm" type="button"
+                      id="copyPathForFolderBtn"
+                      onclick="copyPathForFolder()"
+                      title="Copia la ruta de trabajo al portapapeles para pegarla en el explorador de archivos"
+                      style="display:none">
+                <i class="fas fa-copy me-1"></i>Copiar ruta
+              </button>
+              <button class="btn btn-outline-primary btn-sm" type="button"
+                      onclick="document.getElementById('folderInput').click()"
+                      title="Abre el selector de carpeta y carga todos los .gz que contenga">
+                <i class="fas fa-folder-open me-1"></i>Cargar carpeta
+              </button>
+              <input type="file" id="folderInput" multiple accept=".gz"
+                     webkitdirectory style="display:none"
+                     onchange="handleFiles(this.files)">
+            </div>
+            <div id="folderPathHint" class="text-muted small mb-2" style="display:none">
+              <i class="fas fa-info-circle me-1"></i>
+              Pega la ruta copiada en la barra de dirección del explorador de archivos (Ctrl+V o Ctrl+L)
+            </div>
+            <div class="upload-zone" id="uploadZone"
+                 onclick="document.getElementById('fileInput').click()"
+                 ondragover="onDragOver(event)"
+                 ondragleave="onDragLeave(event)"
+                 ondrop="onDrop(event)">
+              <input type="file" id="fileInput" multiple accept=".gz"
+                     style="display:none" onchange="handleFiles(this.files)">
+              <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+              <p><strong>Arrastra archivos .gz aquí</strong> o haz clic para seleccionar ficheros sueltos</p>
+              <p class="mt-1" style="font-size:0.78rem;">Se borrarán del servidor automáticamente tras el análisis</p>
+            </div>
+            <div class="file-list" id="fileList"></div>
           </div>
 
           <hr class="my-4">
 
           <!-- Secuencia de referencia -->
           <div class="mb-3">
-            <label class="form-label" for="refPrP">
+            <label class="form-label">
               Secuencia PrP de referencia
               <span class="tooltip-icon" data-bs-toggle="tooltip"
-                title="Secuencia de nucleotídos de PrP usada como query en BLAST.">
+                title="Elige una secuencia predefinida o pega tu propia secuencia nucleotídica.">
                 <i class="fas fa-question-circle"></i></span>
             </label>
-            <select id="refPrP"></select>
-            <!-- Sequence preview -->
-            <div class="seq-preview-box" id="seqPreviewBox">
-              <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
-              <div class="seq-preview-bases" id="seqPreviewBases">—</div>
-              <div class="seq-meta" id="seqMeta"></div>
+            <!-- Toggle predefinida / personalizada -->
+            <div class="d-flex gap-2 mb-2">
+              <button type="button" id="refModePreset" class="btn btn-sm btn-purple-active"
+                      onclick="setRefMode('preset')">
+                <i class="fas fa-list me-1"></i>Predefinida
+              </button>
+              <button type="button" id="refModeCustom" class="btn btn-sm btn-outline-secondary"
+                      onclick="setRefMode('custom')">
+                <i class="fas fa-paste me-1"></i>Pegar secuencia
+              </button>
             </div>
-            <div class="help-text mt-2">
-              <i class="fas fa-lightbulb text-warning me-1"></i>
-              Usa el buscador del desplegable para filtrar por nombre de especie.
-              Ahora disponible con 38 secuencias de referencia de PrP de mamíferos.
+
+            <!-- Modo predefinida -->
+            <div id="refPresetBlock">
+              <select id="refPrP"></select>
+              <div class="seq-preview-box" id="seqPreviewBox">
+                <!-- Vista normal -->
+                <div id="seqPreviewView">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:2px 8px;" onclick="openSeqEditor()">
+                      <i class="fas fa-edit me-1"></i>Editar
+                    </button>
+                  </div>
+                  <div class="seq-preview-bases" id="seqPreviewBases">—</div>
+                  <div class="seq-meta" id="seqMeta"></div>
+                </div>
+                <!-- Editor de secuencia -->
+                <div id="seqEditorView" style="display:none">
+                  <div class="seq-preview-label mb-2"><i class="fas fa-edit me-1"></i>Editor de secuencia</div>
+                  <div class="d-flex gap-2 mb-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="trimNterm()" title="Eliminar primeras 100 bases (extremo N-terminal)">
+                      <i class="fas fa-cut me-1"></i>−100 N-term
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="trimCterm()" title="Eliminar últimas 100 bases (extremo C-terminal)">
+                      <i class="fas fa-cut me-1"></i>−100 C-term
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" onclick="restoreOriginalSeq()">
+                      <i class="fas fa-undo me-1"></i>Restaurar original
+                    </button>
+                  </div>
+                  <textarea id="seqEditorTextarea" class="form-control font-monospace" rows="6"
+                            style="font-size:.76rem;resize:vertical;white-space:pre-wrap;word-break:break-all"
+                            oninput="onSeqEditorInput()"></textarea>
+                  <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="seq-meta" id="seqEditorMeta"></span>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeSeqEditor(false)">Cancelar</button>
+                      <button type="button" class="btn btn-sm btn-purple-active" onclick="closeSeqEditor(true)">
+                        <i class="fas fa-check me-1"></i>Aplicar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="help-text mt-2">
+                <i class="fas fa-lightbulb text-warning me-1"></i>
+                Usa el buscador del desplegable para filtrar por nombre de especie.
+                Ahora disponible con 38 secuencias de referencia de PrP de mamíferos.
+              </div>
+            </div>
+
+            <!-- Modo personalizada -->
+            <div id="refCustomBlock" style="display:none">
+              <input type="text" class="form-control form-control-sm mb-2" id="refCustomName"
+                     placeholder="Nombre de la secuencia (ej: PrP Myotis myotis secuenciada)"
+                     oninput="updateCustomPreview()">
+              <textarea class="form-control font-monospace" id="refCustomSeq" rows="5"
+                        placeholder="Pega aquí la secuencia nucleotídica (FASTA o sólo bases A/T/G/C)…"
+                        oninput="updateCustomPreview()" style="font-size:.78rem;resize:vertical"></textarea>
+              <div class="seq-preview-box mt-2" id="seqCustomPreviewBox" style="display:none">
+                <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
+                <div class="seq-preview-bases" id="seqCustomPreviewBases">—</div>
+                <div class="seq-meta" id="seqCustomMeta"></div>
+              </div>
             </div>
           </div>
 
-          <hr class="my-4">
-
-          <!-- Ruta de salida -->
+          <!-- Parámetros BLAST avanzados -->
           <div class="mb-3">
-            <label class="form-label" for="rutaSalida">
-              Ruta de salida
-              <span class="tooltip-icon" data-bs-toggle="tooltip"
-                title="Directorio donde se guardarán los resultados (TXT y FASTA). Por defecto igual a la ruta base.">
-                <i class="fas fa-question-circle"></i></span>
-            </label>
-            <div class="input-group">
-              <button class="btn btn-outline-secondary" type="button"
-                      onclick="resetSalida()"
-                      title="Copiar ruta base como carpeta de salida">
-                <i class="fas fa-folder-plus"></i>
-              </button>
-              <input type="text" class="form-control" id="rutaSalida"
-                     placeholder="Se rellena automáticamente con la ruta base"
-                     oninput="markSalidaManual()">
-              <button class="btn btn-outline-secondary" type="button"
-                      onclick="resetSalida()" title="Restaurar al valor por defecto">
-                <i class="fas fa-undo"></i>
-              </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100 text-start" onclick="toggleBlastParams()"
+                    id="blastParamsToggle" style="font-size:.82rem;">
+              <i class="fas fa-sliders-h me-2"></i>Parámetros BLAST avanzados
+              <i class="fas fa-chevron-down ms-2 float-end" id="blastParamsChevron" style="margin-top:2px;transition:transform .2s"></i>
+            </button>
+            <div id="blastParamsPanel" style="display:none;background:#faf5ff;border:1px solid #d6bcfa;border-radius:0 0 10px 10px;padding:14px 16px;border-top:none;">
+              <div class="row g-3">
+                <div class="col-sm-6">
+                  <label class="form-label" style="font-size:.82rem;font-weight:600;color:#4a5568;" for="blastEvalue">
+                    E-value
+                    <span class="tooltip-icon" data-bs-toggle="tooltip"
+                      title="Umbral de E-value para BLASTN. Por defecto: 10 (valor estándar de BLAST). Valores menores son más estrictos (ej: 1e-5).">
+                      <i class="fas fa-question-circle"></i></span>
+                  </label>
+                  <input type="text" class="form-control form-control-sm font-monospace" id="blastEvalue"
+                         placeholder="Por defecto: 10" style="font-size:.82rem;">
+                  <div class="help-text mt-1">Menor = más estricto (ej: <code>1e-5</code>)</div>
+                </div>
+                <div class="col-sm-6">
+                  <label class="form-label" style="font-size:.82rem;font-weight:600;color:#4a5568;" for="blastPercIdentity">
+                    % Identidad mínima
+                    <span class="tooltip-icon" data-bs-toggle="tooltip"
+                      title="Filtro de porcentaje de identidad de secuencia. Por defecto: sin filtro. Valor entre 0 y 100.">
+                      <i class="fas fa-question-circle"></i></span>
+                  </label>
+                  <input type="number" class="form-control form-control-sm" id="blastPercIdentity"
+                         placeholder="Sin filtro" min="0" max="100" step="0.1" style="font-size:.82rem;">
+                  <div class="help-text mt-1">0–100, sin valor = sin filtro</div>
+                </div>
+              </div>
             </div>
-            <div class="help-text">Se rellena automáticamente con la ruta base. Edítalo para usar una carpeta diferente.</div>
           </div>
 
           <!-- Validation error -->
@@ -200,8 +388,11 @@
 
           <!-- Start button -->
           <div class="d-flex align-items-center gap-3 flex-wrap">
-            <button class="btn btn-generate btn-generate-purple" id="startBtn" onclick="startAnalysis()">
-              <i class="fas fa-play-circle me-2"></i>Iniciar Análisis
+            <button class="btn btn-generate btn-generate-purple" id="addToQueueBtn" onclick="addToQueue()">
+              <i class="fas fa-plus-circle me-2"></i>Añadir a cola
+            </button>
+            <button class="btn btn-outline-secondary" id="startBtn" onclick="startAnalysis()" style="display:none">
+              <i class="fas fa-play-circle me-2"></i>Ejecutar ahora
             </button>
             <span class="dev-badge">
               <i class="fas fa-flask me-1"></i>BLAST+ requerido en el servidor
@@ -233,14 +424,52 @@
       </div>
     </div>
 
+    <!-- Queue Panel -->
+    <div id="queuePanel" class="mt-4" style="display:none">
+      <div class="form-card">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <h4 class="mb-0"><i class="fas fa-layer-group me-2"></i>Cola de análisis &nbsp;<span class="badge rounded-pill" id="queueCount" style="background:#6b46c1;color:#fff">0</span></h4>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="clearQueue()">
+              <i class="fas fa-times me-1"></i>Vaciar cola
+            </button>
+            <button class="btn btn-generate btn-generate-purple btn-sm" id="runQueueBtn" onclick="runQueue()">
+              <i class="fas fa-play-circle me-2"></i>Ejecutar cola
+            </button>
+          </div>
+        </div>
+        <!-- Barra de progreso global (oculta hasta que se ejecuta) -->
+        <div id="queueProgressWrap" style="display:none" class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1" style="font-size:.82rem">
+            <span id="queueProgressLabel" class="text-secondary">Preparando…</span>
+            <span id="queueProgressFrac" class="fw-bold" style="color:#6b46c1">0 / 0</span>
+          </div>
+          <div class="progress" style="height:10px;border-radius:6px">
+            <div id="queueProgressBar" class="progress-bar" role="progressbar"
+                 style="width:0%;background:#6b46c1;transition:width .4s ease" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+        </div>
+        <div id="queueList"></div>
+        <p class="text-muted small mt-2 mb-0" style="font-size:.76rem">
+          <i class="fas fa-arrows-alt me-1"></i>Arrastra las filas para reordenar
+        </p>
+      </div>
+    </div>
+
     <!-- Progress Panel -->
     <div id="progressPanel" class="mt-4">
       <div class="form-card">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <h4 class="mb-0"><i class="fas fa-terminal me-2"></i>Progreso del análisis</h4>
-          <span class="status-badge" id="statusBadge">
-            <i class="fas fa-circle-notch fa-spin me-1"></i>Ejecutando…
-          </span>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-outline-danger btn-sm" id="cancelBtn"
+                    onclick="cancelAnalysis()" style="display:none">
+              <i class="fas fa-stop-circle me-1"></i>Cancelar
+            </button>
+            <span class="status-badge" id="statusBadge">
+              <i class="fas fa-circle-notch fa-spin me-1"></i>Ejecutando…
+            </span>
+          </div>
         </div>
         <div class="log-box" id="logBox"></div>
         <div class="mt-3 d-none" id="summaryBox">
@@ -260,17 +489,49 @@
       </div>
     </div>
 
+    <!-- Retry Panel (visible solo si no hay hits) -->
+    <div id="retryPanel" class="mt-4">
+      <div class="retry-card">
+        <h5><i class="fas fa-search me-2"></i>No se encontró PRNP — ¿Probar con otra secuencia de referencia?</h5>
+        <p style="font-size:0.87rem;color:#744210;" class="mb-3">
+          Los archivos del genoma siguen en el servidor. Selecciona una referencia diferente y reintenta sin necesidad de volver a subir los archivos.
+        </p>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nueva secuencia de referencia</label>
+          <div id="retrySelectContainer" style="max-width:420px;"></div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-warning" onclick="retryAnalysis()">
+            <i class="fas fa-redo me-1"></i>Reintentar con esta referencia
+          </button>
+          <button class="btn btn-outline-danger" onclick="deleteKeptFiles()">
+            <i class="fas fa-trash me-1"></i>Borrar archivos del servidor
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Results Panel -->
     <div id="resultsPanel" class="mt-4">
       <div class="form-card">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <h4 class="mb-0"><i class="fas fa-dna me-2"></i>Resultados</h4>
-          <button class="btn btn-outline-secondary btn-sm" onclick="clearResults()">
-            <i class="fas fa-trash me-1"></i>Limpiar resultados
-          </button>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-secondary btn-sm" onclick="newSpecies()" title="Reinicia el formulario sin borrar resultados">
+              <i class="fas fa-plus me-1"></i>Nueva especie
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="clearResults()">
+              <i class="fas fa-trash me-1"></i>Limpiar resultados
+            </button>
+          </div>
         </div>
         <div id="resultsContainer">
           <p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>Los resultados aparecerán aquí al terminar el análisis.</p>
+        </div>
+        <div class="mt-3 text-end" id="exportWordBtnRow" style="display:none!important">
+          <button class="btn btn-outline-primary" onclick="exportWord()">
+            <i class="fas fa-file-word me-2"></i>Exportar informe Word
+          </button>
         </div>
       </div>
     </div>
@@ -289,9 +550,7 @@
 
 <!-- ── Bloque 1: funciones UI independientes (no dependen de datos Flask) ── -->
 <script>
-// ── Rutas ──
-let salidaManual = false;
-
+// ── Ruta de referencia (solo visual) ──
 function normalizePath(p) {
     p = p.trim();
     if (p && !p.endsWith('\\') && !p.endsWith('/')) {
@@ -302,32 +561,360 @@ function normalizePath(p) {
 
 function fillExamplePath() {
     document.getElementById('rutaBase').value = 'F:\\WGS\\';
-    updatePaths();
+    updatePathPreview();
 }
 
-function updatePaths() {
+function updatePathPreview() {
     const base    = document.getElementById('rutaBase').value;
     const species = document.getElementById('nombreEspecie').value.trim();
     const norm    = normalizePath(base);
     const full    = norm + species;
-    const box     = document.getElementById('pathPreviewBox');
     const txt     = document.getElementById('pathPreviewText');
+    const btn     = document.getElementById('copyPathBtn');
+    const box     = document.getElementById('pathPreviewBox');
     if (base.trim() || species) {
-        txt.textContent = full || '\u2014';
+        txt.textContent = normalizePath(full) || '\u2014';
         box.classList.add('path-preview-active');
+        btn.style.display = '';
+        document.getElementById('copyPathForFolderBtn').style.display = '';
     } else {
         txt.textContent = 'Rellena los campos anteriores\u2026';
         box.classList.remove('path-preview-active');
+        btn.style.display = 'none';
+        document.getElementById('copyPathForFolderBtn').style.display = 'none';
+        document.getElementById('folderPathHint').style.display = 'none';
     }
-    if (!salidaManual) document.getElementById('rutaSalida').value = norm;
+}
+
+// ── Taxonomía ──
+let _taxoDB = null;
+let _taxoDebounce = null;
+
+async function loadTaxoDB() {
+    if (_taxoDB) return _taxoDB;
+    try {
+        const r = await fetch('/static/data/taxonomy.json');
+        _taxoDB = await r.json();
+    } catch(e) {
+        _taxoDB = {};
+    }
+    return _taxoDB;
+}
+loadTaxoDB(); // precarga en background al abrir la página
+
+// Mapeo orden+familia → nombre de referencia
+const TAXO_REF_MAP = [
+    // Chiroptera por familia
+    { orden: 'Chiroptera', familia: 'Vespertilionidae',  ref: 'Murciélago orejudo PrP' },
+    { orden: 'Chiroptera', familia: 'Phyllostomidae',    ref: 'Murciélago de hoja nasal PrP' },
+    { orden: 'Chiroptera', familia: 'Pteropodidae',      ref: 'Murciélago frugívoro PrP' },
+    { orden: 'Chiroptera', familia: 'Molossidae',        ref: 'Murciélago de alas de saco PrP' },
+    { orden: 'Chiroptera', familia: null,                ref: 'Murciélago PrP' },
+    // Rodentia por familia
+    { orden: 'Rodentia',   familia: 'Sciuridae',         ref: 'Ardilla PrP' },
+    { orden: 'Rodentia',   familia: 'Muridae',           ref: 'Rata PrP' },
+    { orden: 'Rodentia',   familia: 'Cricetidae',        ref: 'Ratón espinoso PrP' },
+    { orden: 'Rodentia',   familia: 'Arvicolidae',       ref: 'Topillo PrP' },
+    { orden: 'Rodentia',   familia: 'Spalacidae',        ref: 'Rata topo PrP' },
+    { orden: 'Rodentia',   familia: null,                ref: 'Ratón espinoso PrP' },
+    // Resto por orden
+    { orden: 'Primates',          familia: null, ref: 'Macaco PrP' },
+    { orden: 'Cetartiodactyla',   familia: null, ref: 'Oveja PrP' },
+    { orden: 'Artiodactyla',      familia: null, ref: 'Oveja PrP' },
+    { orden: 'Carnivora',         familia: null, ref: 'Gato PrP' },
+    { orden: 'Lagomorpha',        familia: null, ref: 'Conejo PrP' },
+    { orden: 'Proboscidea',       familia: null, ref: 'Elefante PrP' },
+    { orden: 'Eulipotyphla',      familia: null, ref: 'Musaraña PrP' },
+    { orden: 'Soricomorpha',      familia: null, ref: 'Musaraña PrP' },
+    // Marsupiales (varios órdenes)
+    { orden: 'Dasyuromorphia',    familia: null, ref: 'Canguro PrP' },
+    { orden: 'Diprotodontia',     familia: null, ref: 'Canguro PrP' },
+    { orden: 'Peramelemorphia',   familia: null, ref: 'Canguro PrP' },
+    { orden: 'Monotremata',       familia: null, ref: 'Canguro PrP' },
+];
+
+function suggestRef(orden, familia) {
+    for (const rule of TAXO_REF_MAP) {
+        if (rule.orden.toLowerCase() === orden.toLowerCase()) {
+            if (!rule.familia || rule.familia.toLowerCase() === familia.toLowerCase()) {
+                return rule.ref;
+            }
+        }
+    }
+    return null;
+}
+
+function applyTaxonomy(entry) {
+    document.getElementById('taxoGenero').textContent  = entry.genero;
+    document.getElementById('taxoFamilia').textContent = entry.familia;
+    document.getElementById('taxoOrden').textContent   = entry.orden;
+    document.getElementById('taxoPanel').style.display = '';
+    window.currentTaxonomy = { genero: entry.genero, familia: entry.familia, orden: entry.orden };
+
+    const ref = suggestRef(entry.orden, entry.familia);
+    const suggBox  = document.getElementById('taxoSuggestion');
+    const suggText = document.getElementById('taxoSuggestionText');
+    if (ref) {
+        suggText.textContent = 'Referencia sugerida: ' + ref;
+        suggBox.style.display = '';
+        // Pre-seleccionar en Tom-Select si ya está iniciado
+        if (window.tomSelect) {
+            try { window.tomSelect.setValue(ref); } catch(e) {}
+        }
+    } else {
+        suggBox.style.display = 'none';
+    }
+}
+
+function hideTaxonomy() {
+    document.getElementById('taxoPanel').style.display = 'none';
+    document.getElementById('speciesSuggestions').style.display = 'none';
+    window.currentTaxonomy = null;
+}
+
+async function onSpeciesInput(val) {
+    clearTimeout(_taxoDebounce);
+    const q = val.trim().toLowerCase();
+    const sugBox = document.getElementById('speciesSuggestions');
+
+    if (q.length < 3) { sugBox.style.display = 'none'; return; }
+
+    _taxoDebounce = setTimeout(async () => {
+        const db = await loadTaxoDB();
+        // Exact match
+        if (db[q]) { applyTaxonomy(db[q]); sugBox.style.display = 'none'; return; }
+
+        // Partial match: genus starts with q, or full name contains q
+        const matches = Object.values(db).filter(e =>
+            e.especie.toLowerCase().startsWith(q) || e.especie.toLowerCase().includes(q)
+        ).slice(0, 10);
+
+        if (!matches.length) { hideTaxonomy(); sugBox.style.display = 'none'; return; }
+
+        sugBox.innerHTML = matches.map(e =>
+            `<div class="dropdown-item" onclick="selectSpeciesSuggestion('${e.especie.replace(/'/g,"\\'")}')">
+                <span class="suggest-species">${e.especie}</span>
+                <span class="suggest-meta ms-2">${e.familia} · ${e.orden}</span>
+             </div>`
+        ).join('');
+        sugBox.style.display = '';
+    }, 250);
+}
+
+function selectSpeciesSuggestion(especie) {
+    document.getElementById('nombreEspecie').value = especie;
+    document.getElementById('speciesSuggestions').style.display = 'none';
+    updatePathPreview();
+    loadTaxoDB().then(db => {
+        const entry = db[especie.toLowerCase()];
+        if (entry) applyTaxonomy(entry);
+    });
+}
+
+// Ocultar sugerencias al hacer click fuera
+document.addEventListener('click', e => {
+    if (!e.target.closest('#nombreEspecie') && !e.target.closest('#speciesSuggestions')) {
+        document.getElementById('speciesSuggestions').style.display = 'none';
+    }
+});
+
+function copyPath() {
+    const path = document.getElementById('pathPreviewText').textContent;
+    navigator.clipboard.writeText(path)
+        .then(() => {
+            const btn = document.getElementById('copyPathBtn');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => { btn.innerHTML = orig; }, 1500);
+        })
+        .catch(() => alert('No se pudo copiar.'));
+}
+
+function copyPathForFolder() {
+    const path = document.getElementById('pathPreviewText').textContent;
+    if (!path || path.includes('Rellena')) {
+        alert('Introduce primero la ruta base y el nombre de especie.');
+        return;
+    }
+    navigator.clipboard.writeText(path)
+        .then(() => {
+            const btn = document.getElementById('copyPathForFolderBtn');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check me-1"></i>¡Copiada!';
+            btn.classList.replace('btn-outline-secondary', 'btn-success');
+            document.getElementById('folderPathHint').style.display = '';
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.replace('btn-success', 'btn-outline-secondary');
+            }, 3000);
+        })
+        .catch(() => alert('No se pudo copiar la ruta.'));
+}
+
+// ── Subida de archivos ──
+let selectedFiles = [];
+
+function formatBytes(b) {
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' MB';
+    return (b / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
+function handleFiles(files) {
+    for (const f of files) {
+        if (f.name.endsWith('.gz') && !selectedFiles.find(x => x.name === f.name)) {
+            selectedFiles.push(f);
+        }
+    }
+    renderFileList();
     document.getElementById('validationAlert').classList.add('d-none');
 }
 
-function markSalidaManual() { salidaManual = true; }
-function resetSalida() {
-    salidaManual = false;
-    document.getElementById('rutaSalida').value =
-        normalizePath(document.getElementById('rutaBase').value);
+function removeFile(name) {
+    selectedFiles = selectedFiles.filter(f => f.name !== name);
+    renderFileList();
+}
+
+function renderFileList() {
+    const list = document.getElementById('fileList');
+    if (!selectedFiles.length) { list.innerHTML = ''; return; }
+    list.innerHTML = selectedFiles.map(f =>
+        '<div class="file-item">'
+      + '<i class="fas fa-file-archive text-secondary"></i>'
+      + '<span class="file-name">' + escHtml(f.name) + '</span>'
+      + '<span class="file-size">' + formatBytes(f.size) + '</span>'
+      + '<button class="file-remove" onclick="removeFile(\'' + escHtml(f.name) + '\')" title="Quitar">'
+      + '<i class="fas fa-times"></i></button>'
+      + '</div>'
+    ).join('');
+}
+
+function onDragOver(e) {
+    e.preventDefault();
+    document.getElementById('uploadZone').classList.add('drag-over');
+}
+function onDragLeave(e) {
+    document.getElementById('uploadZone').classList.remove('drag-over');
+}
+function onDrop(e) {
+    e.preventDefault();
+    document.getElementById('uploadZone').classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+}
+
+// ── Modo de referencia (predefinida / personalizada) ──
+let _refMode = 'preset';  // 'preset' | 'custom'
+
+function setRefMode(mode) {
+    _refMode = mode;
+    document.getElementById('refPresetBlock').style.display = mode === 'preset' ? '' : 'none';
+    document.getElementById('refCustomBlock').style.display = mode === 'custom' ? '' : 'none';
+    document.getElementById('refModePreset').className = mode === 'preset'
+        ? 'btn btn-sm btn-purple-active' : 'btn btn-sm btn-outline-secondary';
+    document.getElementById('refModeCustom').className = mode === 'custom'
+        ? 'btn btn-sm btn-purple-active' : 'btn btn-sm btn-outline-secondary';
+}
+
+function updateCustomPreview() {
+    const raw  = document.getElementById('refCustomSeq').value;
+    const seq  = raw.replace(/^>.*$/mg, '').replace(/\s/g, '').toUpperCase();
+    const box  = document.getElementById('seqCustomPreviewBox');
+    if (!seq) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    document.getElementById('seqCustomPreviewBases').textContent = seq.slice(0, 100) + (seq.length > 100 ? '…' : '');
+    document.getElementById('seqCustomMeta').textContent = seq.length + ' bases';
+}
+
+function getCustomRef() {
+    const raw  = document.getElementById('refCustomSeq').value;
+    const seq  = raw.replace(/^>.*$/mg, '').replace(/\s/g, '').toUpperCase();
+    const name = document.getElementById('refCustomName').value.trim() || 'Secuencia personalizada';
+    return { refName: name, refSequence: seq };
+}
+
+// ── Editor de secuencia de referencia predefinida ──
+let _editedRefSeq = null;   // null = usar secuencia original; string = secuencia editada
+let _originalRefSeq = '';   // copia de la secuencia original para restaurar
+
+function openSeqEditor() {
+    if (!window.tomSelect || !window.PRP_SEQUENCES) return;
+    const name = window.tomSelect.getValue();
+    const data = window.PRP_SEQUENCES[name];
+    if (!data) return;
+    _originalRefSeq = data.sequence.replace(/\s/g, '');
+    const current = _editedRefSeq !== null ? _editedRefSeq : _originalRefSeq;
+    document.getElementById('seqEditorTextarea').value = current;
+    _updateEditorMeta(current.length);
+    document.getElementById('seqPreviewView').style.display = 'none';
+    document.getElementById('seqEditorView').style.display = '';
+}
+
+function closeSeqEditor(apply) {
+    if (apply) {
+        const newSeq = document.getElementById('seqEditorTextarea').value.replace(/\s/g, '').toUpperCase();
+        if (newSeq.length < 10) { alert('La secuencia editada es demasiado corta.'); return; }
+        _editedRefSeq = newSeq;
+        // Actualizar preview con la secuencia editada
+        document.getElementById('seqPreviewBases').textContent = newSeq.slice(0, 100) + (newSeq.length > 100 ? '…' : '');
+        const origLen = _originalRefSeq.length;
+        const diff = origLen - newSeq.length;
+        const diffStr = diff > 0 ? ` (−${diff} bases respecto al original)` : '';
+        document.getElementById('seqMeta').textContent =
+            'Longitud: ' + newSeq.length + ' bp' + diffStr + ' ✎ editada';
+    }
+    document.getElementById('seqEditorView').style.display = 'none';
+    document.getElementById('seqPreviewView').style.display = '';
+}
+
+function trimNterm() {
+    const ta = document.getElementById('seqEditorTextarea');
+    const seq = ta.value.replace(/\s/g, '');
+    if (seq.length <= 100) { alert('La secuencia es ya de 100 bases o menos; no se puede recortar más.'); return; }
+    ta.value = seq.slice(100);
+    _updateEditorMeta(ta.value.length);
+}
+
+function trimCterm() {
+    const ta = document.getElementById('seqEditorTextarea');
+    const seq = ta.value.replace(/\s/g, '');
+    if (seq.length <= 100) { alert('La secuencia es ya de 100 bases o menos; no se puede recortar más.'); return; }
+    ta.value = seq.slice(0, -100);
+    _updateEditorMeta(ta.value.length);
+}
+
+function restoreOriginalSeq() {
+    document.getElementById('seqEditorTextarea').value = _originalRefSeq;
+    _editedRefSeq = null;
+    _updateEditorMeta(_originalRefSeq.length);
+}
+
+function onSeqEditorInput() {
+    const len = document.getElementById('seqEditorTextarea').value.replace(/\s/g, '').length;
+    _updateEditorMeta(len);
+}
+
+function _updateEditorMeta(len) {
+    const orig = _originalRefSeq.length;
+    const diff = orig - len;
+    const diffStr = diff > 0 ? `  |  −${diff} vs original` : (diff < 0 ? `  |  +${Math.abs(diff)} vs original` : '');
+    document.getElementById('seqEditorMeta').textContent = `${len} bp${diffStr}`;
+}
+
+// ── Parámetros BLAST avanzados ──
+let _blastParamsOpen = false;
+function toggleBlastParams() {
+    _blastParamsOpen = !_blastParamsOpen;
+    document.getElementById('blastParamsPanel').style.display = _blastParamsOpen ? '' : 'none';
+    document.getElementById('blastParamsChevron').style.transform = _blastParamsOpen ? 'rotate(180deg)' : '';
+    document.getElementById('blastParamsToggle').style.borderRadius = _blastParamsOpen
+        ? '6px 6px 0 0' : '';
+}
+
+function getBlastParams() {
+    return {
+        evalue: document.getElementById('blastEvalue').value.trim(),
+        percIdentity: document.getElementById('blastPercIdentity').value.trim()
+    };
 }
 
 // ── Validación ──
@@ -337,15 +924,18 @@ function showValidationError(msg) {
 }
 
 function validate() {
-    const base    = document.getElementById('rutaBase').value.trim();
     const species = document.getElementById('nombreEspecie').value.trim();
-    const ref     = window.tomSelect ? window.tomSelect.getValue()
-                                     : document.getElementById('refPrP').value;
-    const salida  = document.getElementById('rutaSalida').value.trim();
-    if (!base)    { showValidationError('La ruta base de trabajo es obligatoria.'); return false; }
+    if (!selectedFiles.length) { showValidationError('Selecciona al menos un archivo .gz de genoma.'); return false; }
     if (!species) { showValidationError('El nombre de la especie es obligatorio.'); return false; }
-    if (!ref)     { showValidationError('Selecciona una secuencia PrP de referencia.'); return false; }
-    if (!salida)  { showValidationError('La ruta de salida es obligatoria.'); return false; }
+    if (_refMode === 'preset') {
+        const ref = window.tomSelect ? window.tomSelect.getValue()
+                                     : document.getElementById('refPrP').value;
+        if (!ref) { showValidationError('Selecciona una secuencia PrP de referencia.'); return false; }
+    } else {
+        const seq = document.getElementById('refCustomSeq').value.replace(/^>.*$/mg,'').replace(/\s/g,'');
+        if (!seq) { showValidationError('Pega una secuencia nucleotídica de referencia.'); return false; }
+        if (seq.length < 50) { showValidationError('La secuencia personalizada parece demasiado corta (mín. 50 bases).'); return false; }
+    }
     document.getElementById('validationAlert').classList.add('d-none');
     return true;
 }
@@ -392,6 +982,22 @@ function resetBtn() {
     const btn = document.getElementById('startBtn');
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Iniciar An\u00e1lisis';
+    document.getElementById('cancelBtn').style.display = 'none';
+}
+
+function showCancelBtn() {
+    document.getElementById('cancelBtn').style.display = '';
+}
+
+async function cancelAnalysis() {
+    if (!currentJobId) return;
+    const btn = document.getElementById('cancelBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-1"></i>Cancelando…';
+    try {
+        await fetch('/prnp-orthominer/cancel/' + currentJobId, { method: 'POST' });
+    } catch(e) { /* ignore network error */ }
+    // SSE will receive 'warning' + 'done' from the server naturally
 }
 
 function clearLog() {
@@ -414,17 +1020,32 @@ function appendResult(data) {
     resultCount++;
     const panel     = document.getElementById('resultsPanel');
     const container = document.getElementById('resultsContainer');
-    if (resultCount === 1) {
-        container.innerHTML = '';
-        panel.style.display = 'block';
-        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    const cardId = 'result-' + resultCount;
-    const seqId  = 'seq-'    + resultCount;
-    const infoId = 'info-'   + resultCount;
+    // Clear placeholder on first result; after that accumulate
+    if (container.querySelector('.no-results-msg')) container.innerHTML = '';
+    panel.style.display = 'block';
+    if (resultCount === 1) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const n      = resultCount;
+    const cardId = 'result-' + n;
+    const seqId  = 'seq-'    + n;
+    const infoId = 'info-'   + n;
+    const orfId  = 'orf-'    + n;
     const card   = document.createElement('div');
     card.className = 'result-card';
     card.id = cardId;
+
+    const taxo = window.currentTaxonomy || {};
+    const taxoBadges = taxo.genero
+        ? '<div class="d-flex flex-wrap gap-2 px-3 py-2" style="background:#faf5ff;border-bottom:1px solid #e9d8fd;">'
+          + '<span class="badge rounded-pill" style="background:#e9d8fd;color:#44337a;font-weight:500">'
+          +   '<i class="fas fa-sitemap me-1"></i>' + escHtml(taxo.genero) + '</span>'
+          + '<span class="badge rounded-pill" style="background:#e9d8fd;color:#44337a;font-weight:500">'
+          +   '<i class="fas fa-layer-group me-1"></i>' + escHtml(taxo.familia) + '</span>'
+          + '<span class="badge rounded-pill" style="background:#e9d8fd;color:#44337a;font-weight:500">'
+          +   '<i class="fas fa-tree me-1"></i>' + escHtml(taxo.orden) + '</span>'
+          + '</div>'
+        : '';
+
     card.innerHTML =
         '<div class="result-card-header">'
       +   '<span class="result-title"><i class="fas fa-dna me-2"></i>'
@@ -432,9 +1053,10 @@ function appendResult(data) {
       +     '<span class="ms-2 opacity-75" style="font-weight:400;font-size:0.78rem;">'
       +       escHtml(data.genome_file) + '</span></span>'
       +   '<button class="btn btn-sm btn-light btn-copy-sm"'
-      +     ' onclick="downloadFasta(' + resultCount + ')" title="Descargar FASTA">'
+      +     ' onclick="downloadFasta(' + n + ')" title="Descargar FASTA">'
       +     '<i class="fas fa-download me-1"></i>FASTA</button>'
       + '</div>'
+      + taxoBadges
       + '<div class="result-section">'
       +   '<div class="result-section-label">'
       +     '<span><i class="fas fa-info-circle me-1"></i>Informaci\u00f3n gen\u00f3mica</span>'
@@ -447,18 +1069,39 @@ function appendResult(data) {
       + '</div>'
       + '<div class="result-section">'
       +   '<div class="result-section-label">'
-      +     '<span><i class="fas fa-align-left me-1"></i>'
+      +     '<span id="seqLabel-' + n + '"><i class="fas fa-align-left me-1"></i>'
       +       'Secuencia extendida (may\u00fasc.=ORF \u00b7 min\u00fasc.=flancos)</span>'
-      +     '<button class="btn btn-outline-secondary btn-sm btn-copy-sm"'
-      +       ' onclick="copyField(\'' + seqId + '\')">'
-      +       '<i class="fas fa-copy me-1"></i>Copiar</button>'
+      +     '<div class="d-flex gap-1 flex-wrap">'
+      +       '<button class="btn btn-outline-secondary btn-sm btn-copy-sm" id="rcBtn-' + n + '"'
+      +         ' onclick="toggleRC(' + n + ')" title="Mostrar/ocultar reversa complementaria">'
+      +         '<i class="fas fa-exchange-alt me-1"></i>RC</button>'
+      +       '<button class="btn btn-outline-info btn-sm btn-copy-sm"'
+      +         ' onclick="translateSeq(' + n + ')" title="Copiar secuencia y abrir ExPASy Translate">'
+      +         '<i class="fas fa-external-link-alt me-1"></i>Traducir</button>'
+      +       '<button class="btn btn-outline-success btn-sm btn-copy-sm"'
+      +         ' onclick="findORF(' + n + ')" title="Buscar la ORF m\u00e1s larga">'
+      +         '<i class="fas fa-search me-1"></i>Buscar ORF m\u00e1s larga</button>'
+      +       '<button class="btn btn-outline-secondary btn-sm btn-copy-sm"'
+      +         ' onclick="copyField(\'' + seqId + '\')">'
+      +         '<i class="fas fa-copy me-1"></i>Copiar</button>'
+      +     '</div>'
       +   '</div>'
       +   '<textarea id="' + seqId + '" class="result-textarea seq-area" readonly>'
       +     escHtml(data.fasta_content) + '</textarea>'
+      +   '<div id="' + orfId + '"></div>'
       + '</div>';
+
     container.appendChild(card);
-    card.dataset.fastaContent = data.fasta_content;
-    card.dataset.species = data.species || 'PRNP';
+    // Store all data for RC toggle, export, etc.
+    card.dataset.fastaContent   = data.fasta_content;
+    card.dataset.species        = data.species || 'PRNP';
+    card.dataset.coordsSummary  = data.coords_summary || '';
+    card.dataset.genomicInfo    = data.genomic_info || '';
+    card.dataset.refName        = data.ref_name || '';
+    card.dataset.rcActive       = '0';
+
+    // Show export button once we have at least one result
+    document.getElementById('exportWordBtnRow').style.cssText = '';
 }
 
 function copyField(id) {
@@ -499,85 +1142,627 @@ function clearResults() {
         '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>'
         + 'Los resultados aparecer\u00e1n aqu\u00ed al terminar el an\u00e1lisis.</p>';
     document.getElementById('resultsPanel').style.display = 'none';
+    document.getElementById('exportWordBtnRow').style.display = 'none';
+}
+
+function newSpecies() {
+    // Reset form fields and files, but keep results visible
+    document.getElementById('nombreEspecie').value = '';
+    document.getElementById('rutaBase').value = '';
+    updatePathPreview();
+    hideTaxonomy();
+    selectedFiles = [];
+    renderFileList();
+    document.getElementById('summaryBox').classList.add('d-none');
+    document.getElementById('retryPanel').style.display = 'none';
+    document.getElementById('logBox').innerHTML = '';
+    document.getElementById('progressPanel').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Reverse complement ──
+function reverseComplement(seq) {
+    const comp = {'A':'T','T':'A','G':'C','C':'G','a':'t','t':'a','g':'c','c':'g','N':'N','n':'n'};
+    return seq.split('').reverse().map(b => comp[b] !== undefined ? comp[b] : b).join('');
+}
+
+function toggleRC(n) {
+    const card    = document.getElementById('result-' + n);
+    const textarea = document.getElementById('seq-' + n);
+    const btn     = document.getElementById('rcBtn-' + n);
+    const label   = document.getElementById('seqLabel-' + n);
+    if (!card || !textarea) return;
+
+    const isRC = card.dataset.rcActive === '1';
+    if (isRC) {
+        // Restore direct
+        textarea.value = card.dataset.fastaContent;
+        card.dataset.rcActive = '0';
+        btn.classList.remove('btn-rc-active');
+        btn.classList.add('btn-outline-secondary');
+        label.innerHTML = '<i class="fas fa-align-left me-1"></i>Secuencia extendida (may\u00fasc.=ORF \u00b7 min\u00fasc.=flancos)';
+    } else {
+        // Compute RC: keep header line, RC the sequence lines
+        const lines = card.dataset.fastaContent.split('\n');
+        const header = lines[0].replace(/^>/, '>RC|');
+        const seqBases = lines.slice(1).join('');
+        const rcBases  = reverseComplement(seqBases);
+        const rcLines  = [];
+        for (let i = 0; i < rcBases.length; i += 80) rcLines.push(rcBases.slice(i, i+80));
+        textarea.value = header + '\n' + rcLines.join('\n') + '\n';
+        card.dataset.rcActive = '1';
+        btn.classList.add('btn-rc-active');
+        btn.classList.remove('btn-outline-secondary');
+        label.innerHTML = '<i class="fas fa-exchange-alt me-1"></i>Secuencia extendida — <strong>REVERSA COMPLEMENTARIA</strong>';
+    }
+    // Clear ORF result if present
+    document.getElementById('orf-' + n).innerHTML = '';
+}
+
+// ── Translate (ExPASy) ──
+function translateSeq(n) {
+    const textarea = document.getElementById('seq-' + n);
+    if (!textarea) return;
+    navigator.clipboard.writeText(textarea.value)
+        .then(() => window.open('https://web.expasy.org/translate/', '_blank'))
+        .catch(() => {
+            window.open('https://web.expasy.org/translate/', '_blank');
+            alert('No se pudo copiar automáticamente. Pega la secuencia manualmente en ExPASy.');
+        });
+}
+
+// ── Find longest ORF ──
+function findLongestORF(seqRaw) {
+    const STOP = new Set(['TAA','TAG','TGA']);
+    const s = seqRaw.toUpperCase().replace(/[^ACGTN\n]/g, '').replace(/\n/g,'');
+    const compMap = {'A':'T','T':'A','G':'C','C':'G','N':'N'};
+    const rc = s.split('').reverse().map(b => compMap[b]||b).join('');
+    let best = null;
+    for (const [strand, seq] of [['+', s], ['-', rc]]) {
+        for (let frame = 0; frame < 3; frame++) {
+            let orfStart = -1;
+            for (let i = frame; i + 2 < seq.length; i += 3) {
+                const codon = seq.slice(i, i+3);
+                if (codon === 'ATG' && orfStart === -1) {
+                    orfStart = i;
+                } else if (STOP.has(codon) && orfStart !== -1) {
+                    const len = i + 3 - orfStart;
+                    if (!best || len > best.len) {
+                        best = { strand, frame: frame+1, start: orfStart+1, end: i+3,
+                                 len, seq: seq.slice(orfStart, i+3) };
+                    }
+                    orfStart = -1;
+                }
+            }
+        }
+    }
+    return best;
+}
+
+function findORF(n) {
+    const card    = document.getElementById('result-' + n);
+    const textarea = document.getElementById('seq-' + n);
+    const box     = document.getElementById('orf-' + n);
+    if (!textarea || !box) return;
+
+    // Get just sequence lines (skip FASTA header)
+    const lines = textarea.value.split('\n');
+    const seqOnly = lines.filter(l => !l.startsWith('>')).join('');
+
+    const orf = findLongestORF(seqOnly);
+    if (!orf) {
+        box.innerHTML = '<div class="orf-result-box text-muted mt-2">No se encontró ninguna ORF con cod. inicio + parada.</div>';
+        return;
+    }
+    const protein = translateDNA(orf.seq);
+    box.innerHTML =
+        '<div class="orf-result-box mt-2">'
+      + '<div class="mb-1"><strong>ORF m\u00e1s larga encontrada</strong>'
+      +   ' &nbsp;<span class="badge bg-success">' + orf.strand + ' hebra, marco ' + orf.frame + '</span></div>'
+      + '<div class="mb-1 text-muted" style="font-size:.78rem">'
+      +   'Posici\u00f3n: ' + orf.start + '\u2013' + orf.end
+      +   ' &nbsp;|&nbsp; Longitud: ' + orf.len + ' nt (' + Math.floor(orf.len/3) + ' aa)'
+      + '</div>'
+      + '<div class="mb-1"><span style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#276749;letter-spacing:.5px">Secuencia nt</span></div>'
+      + '<div class="orf-seq mb-2">' + escHtml(orf.seq) + '</div>'
+      + '<div class="mb-1"><span style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#276749;letter-spacing:.5px">Prot. traducida</span></div>'
+      + '<div class="orf-seq">' + escHtml(protein) + '</div>'
+      + '</div>';
+}
+
+function translateDNA(seq) {
+    const codons = {
+        'TTT':'F','TTC':'F','TTA':'L','TTG':'L','CTT':'L','CTC':'L','CTA':'L','CTG':'L',
+        'ATT':'I','ATC':'I','ATA':'I','ATG':'M','GTT':'V','GTC':'V','GTA':'V','GTG':'V',
+        'TCT':'S','TCC':'S','TCA':'S','TCG':'S','CCT':'P','CCC':'P','CCA':'P','CCG':'P',
+        'ACT':'T','ACC':'T','ACA':'T','ACG':'T','GCT':'A','GCC':'A','GCA':'A','GCG':'A',
+        'TAT':'Y','TAC':'Y','TAA':'*','TAG':'*','CAT':'H','CAC':'H','CAA':'Q','CAG':'Q',
+        'AAT':'N','AAC':'N','AAA':'K','AAG':'K','GAT':'D','GAC':'D','GAA':'E','GAG':'E',
+        'TGT':'C','TGC':'C','TGA':'*','TGG':'W','CGT':'R','CGC':'R','CGA':'R','CGG':'R',
+        'AGT':'S','AGC':'S','AGA':'R','AGG':'R','GGT':'G','GGC':'G','GGA':'G','GGG':'G'
+    };
+    let prot = '';
+    const s = seq.toUpperCase();
+    for (let i = 0; i + 2 < s.length; i += 3) {
+        const aa = codons[s.slice(i, i+3)] || '?';
+        if (aa === '*') { prot += '*'; break; }
+        prot += aa;
+    }
+    return prot;
+}
+
+// ── Export Word ──
+async function exportWord() {
+    const cards = document.querySelectorAll('.result-card');
+    if (!cards.length) return;
+    const species  = document.getElementById('nombreEspecie').value.trim()
+                     || (cards[0] && cards[0].dataset.species) || 'Especie';
+    const taxonomy = window.currentTaxonomy || null;
+    const results  = [];
+    cards.forEach(card => {
+        const n = card.id.replace('result-','');
+        const seqEl  = document.getElementById('seq-'  + n);
+        const rcActive = card.dataset.rcActive === '1';
+        const directFasta = card.dataset.fastaContent || '';
+        let rcFasta = '';
+        if (directFasta) {
+            const lines = directFasta.split('\n');
+            const hdr = lines[0].replace(/^>/, '>RC|');
+            const rcBases = reverseComplement(lines.slice(1).join(''));
+            const rcLines = [];
+            for (let i = 0; i < rcBases.length; i += 80) rcLines.push(rcBases.slice(i, i+80));
+            rcFasta = hdr + '\n' + rcLines.join('\n') + '\n';
+        }
+        results.push({
+            genome_file:    card.dataset.species || '',
+            ref_name:       card.dataset.refName || '',
+            coords_summary: card.dataset.coordsSummary || '',
+            genomic_info:   card.dataset.genomicInfo || '',
+            fasta_direct:   directFasta,
+            fasta_rc:       rcFasta
+        });
+    });
+
+    const btn = document.querySelector('[onclick="exportWord()"]');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Generando…';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/prnp-orthominer/export-docx', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ species, taxonomy, results })
+        });
+        if (!res.ok) throw new Error('Error del servidor');
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = 'PRNP_' + species.replace(/\s+/g,'_') + '.docx';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch(e) {
+        alert('No se pudo generar el informe: ' + e.message);
+    } finally {
+        btn.innerHTML = orig;
+        btn.disabled  = false;
+    }
+}
+
+// ── Server status ──
+async function checkServerStatus() {
+    try {
+        const res  = await fetch('/prnp-orthominer/server-status');
+        const data = await res.json();
+        const txt  = document.getElementById('serverStatusText');
+        const btn  = document.getElementById('cleanupAllBtn');
+        if (data.count === 0) {
+            txt.innerHTML = '<i class="fas fa-server me-1 text-success"></i>Servidor limpio — no hay archivos temporales retenidos.';
+            btn.style.display = 'none';
+        } else {
+            txt.innerHTML = '<i class="fas fa-server me-1 text-warning"></i>'
+                + '<strong>' + data.count + '</strong> carpeta(s) temporal(es) en el servidor'
+                + ' (' + data.total_mb + ' MB). '
+                + data.entries.map(e => '<em>' + escHtml(e.species) + '</em> ' + e.size_mb + ' MB').join(' · ');
+            btn.style.display = '';
+        }
+    } catch(e) {
+        document.getElementById('serverStatusText').innerHTML =
+            '<i class="fas fa-exclamation-triangle me-1 text-danger"></i>No se pudo consultar el estado del servidor.';
+    }
+}
+
+async function cleanupAll() {
+    if (!confirm('¿Borrar todos los archivos temporales retenidos en el servidor?')) return;
+    const btn = document.getElementById('cleanupAllBtn');
+    btn.disabled = true;
+    try {
+        const res  = await fetch('/prnp-orthominer/cleanup-all', { method: 'POST' });
+        const data = await res.json();
+        alert('Eliminadas ' + data.deleted + ' carpeta(s) temporal(es).');
+        checkServerStatus();
+    } catch(e) {
+        alert('Error al limpiar: ' + e.message);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// ── Retry panel ──
+let currentJobId = null;
+let retrySelect  = null;
+
+function showRetryPanel(jobId) {
+    currentJobId = jobId;
+    document.getElementById('retryPanel').style.display = 'block';
+
+    // Crear un Tom-Select de reintento si no existe aún
+    const container = document.getElementById('retrySelectContainer');
+    if (!retrySelect && window.PRP_SEQUENCES) {
+        const sel = document.createElement('select');
+        sel.id = 'retryRefPrP';
+        container.appendChild(sel);
+        const opts = Object.keys(window.PRP_SEQUENCES).sort((a,b) => a.localeCompare(b,'es'));
+        retrySelect = new TomSelect('#retryRefPrP', {
+            options:   opts.map(n => ({ value: n, text: n })),
+            labelField:'text', valueField:'value', searchField:'text',
+            placeholder:'Buscar secuencia PrP\u2026', create: false
+        });
+        if (opts.length) retrySelect.setValue(opts[0]);
+    }
+    document.getElementById('retryPanel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function hideRetryPanel() {
+    document.getElementById('retryPanel').style.display = 'none';
+}
+
+async function retryAnalysis() {
+    if (!currentJobId) return;
+    const refName = retrySelect ? retrySelect.getValue()
+                                : document.getElementById('retryRefPrP').value;
+    if (!refName) { alert('Selecciona una secuencia de referencia.'); return; }
+    const seqData     = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
+    const refSequence = seqData ? seqData.sequence.replace(/\s/g,'') : '';
+
+    hideRetryPanel();
+    document.getElementById('logBox').innerHTML = '';
+    document.getElementById('summaryBox').classList.add('d-none');
+    setStatus('running', 'Ejecutando\u2026');
+    showCancelBtn();
+    appendLog('info', 'Reintentando con referencia: ' + refName);
+
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Analizando\u2026';
+    if (currentES) { currentES.close(); currentES = null; }
+
+    try {
+        const res = await fetch('/prnp-orthominer/retry/' + currentJobId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refName, refSequence })
+        });
+        const { job_id, error } = await res.json();
+        if (error) { appendLog('error', error); setStatus('error','Error'); resetBtn(); return; }
+        currentJobId = job_id;
+        connectSSE(job_id);
+    } catch(err) {
+        appendLog('error', 'Error de red: ' + err);
+        setStatus('error','Error');
+        resetBtn();
+    }
+}
+
+async function deleteKeptFiles() {
+    if (!currentJobId) return;
+    try {
+        await fetch('/prnp-orthominer/delete-files/' + currentJobId, { method: 'POST' });
+    } catch(e) { /* ignorar */ }
+    hideRetryPanel();
+    appendLog('info', 'Archivos del servidor eliminados.');
+    currentJobId = null;
+}
+
+// ── Cola de análisis ──
+let analysisQueue = [];  // [{ species, files, refName, refSequence, taxonomy }]
+
+function getFormItem() {
+    const species = document.getElementById('nombreEspecie').value.trim();
+    let refName, refSequence;
+    if (_refMode === 'custom') {
+        const custom = getCustomRef();
+        refName = custom.refName; refSequence = custom.refSequence;
+    } else {
+        refName = window.tomSelect ? window.tomSelect.getValue()
+                                   : document.getElementById('refPrP').value;
+        const seqData = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
+        const origSeq = seqData ? seqData.sequence.replace(/\s/g, '') : '';
+        refSequence = _editedRefSeq !== null ? _editedRefSeq : origSeq;
+    }
+    const blast = getBlastParams();
+    return { species, files: [...selectedFiles], refName, refSequence,
+             taxonomy: window.currentTaxonomy ? { ...window.currentTaxonomy } : null,
+             blastEvalue: blast.evalue, blastPercIdentity: blast.percIdentity };
+}
+
+function addToQueue() {
+    if (!validate()) return;
+    const item = getFormItem();
+    if (!item.files.length) { alert('Selecciona al menos un archivo .gz.'); return; }
+    analysisQueue.push(item);
+    renderQueue();
+    // Reset form for next species
+    document.getElementById('nombreEspecie').value = '';
+    document.getElementById('rutaBase').value = '';
+    updatePathPreview();
+    hideTaxonomy();
+    selectedFiles = [];
+    renderFileList();
+    document.getElementById('summaryBox').classList.add('d-none');
+    _editedRefSeq = null;
+    updateSeqPreview();
+}
+
+function removeFromQueue(i) {
+    analysisQueue.splice(i, 1);
+    renderQueue();
+}
+
+function clearQueue() {
+    analysisQueue = [];
+    renderQueue();
+}
+
+let _dragSrcIdx = null;
+
+function renderQueue() {
+    const panel = document.getElementById('queuePanel');
+    const list  = document.getElementById('queueList');
+    const count = document.getElementById('queueCount');
+    count.textContent = analysisQueue.length;
+    if (!analysisQueue.length) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    list.innerHTML = analysisQueue.map((item, i) =>
+        '<div class="queue-item" id="qitem-' + i + '" draggable="true"'
+      +   ' ondragstart="onQDragStart(event,' + i + ')"'
+      +   ' ondragover="onQDragOver(event,' + i + ')"'
+      +   ' ondragleave="onQDragLeave(event,' + i + ')"'
+      +   ' ondrop="onQDrop(event,' + i + ')"'
+      +   ' ondragend="onQDragEnd()">'
+      + '<span class="queue-drag-handle me-1"><i class="fas fa-grip-vertical"></i></span>'
+      + '<span class="queue-item-name"><i class="fas fa-paw me-1 text-secondary"></i>'
+      +   escHtml(item.species || '(sin nombre)') + '</span>'
+      + '<span class="queue-item-meta">'
+      +   item.files.length + ' archivo' + (item.files.length > 1 ? 's' : '')
+      +   ' &nbsp;·&nbsp; ' + escHtml(item.refName || '—')
+      + '</span>'
+      + '<span class="queue-item-status" id="qstatus-' + i + '"></span>'
+      + '<button class="btn btn-outline-danger btn-sm btn-copy-sm ms-auto" onclick="removeFromQueue(' + i + ')">'
+      +   '<i class="fas fa-times"></i></button>'
+      + '</div>'
+    ).join('');
+}
+
+function onQDragStart(e, i) {
+    _dragSrcIdx = i;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => { const el = document.getElementById('qitem-' + i); if (el) el.classList.add('dragging'); }, 0);
+}
+function onQDragOver(e, i) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (i !== _dragSrcIdx) {
+        const el = document.getElementById('qitem-' + i);
+        if (el) el.classList.add('drag-over');
+    }
+}
+function onQDragLeave(e, i) {
+    const el = document.getElementById('qitem-' + i);
+    if (el) el.classList.remove('drag-over');
+}
+function onQDrop(e, targetIdx) {
+    e.preventDefault();
+    if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) return;
+    const moved = analysisQueue.splice(_dragSrcIdx, 1)[0];
+    analysisQueue.splice(targetIdx, 0, moved);
+    _dragSrcIdx = null;
+    renderQueue();
+}
+function onQDragEnd() {
+    _dragSrcIdx = null;
+    document.querySelectorAll('.queue-item').forEach(el => {
+        el.classList.remove('dragging', 'drag-over');
+    });
+}
+
+function setQueueProgress(done, total, label) {
+    const wrap  = document.getElementById('queueProgressWrap');
+    const bar   = document.getElementById('queueProgressBar');
+    const frac  = document.getElementById('queueProgressFrac');
+    const lbl   = document.getElementById('queueProgressLabel');
+    wrap.style.display = '';
+    const pct = total ? Math.round(done / total * 100) : 0;
+    bar.style.width    = pct + '%';
+    bar.setAttribute('aria-valuenow', pct);
+    frac.textContent   = done + ' / ' + total + ' completada' + (done !== 1 ? 's' : '');
+    lbl.textContent    = label || '';
+    // Turn bar green when all done
+    bar.style.background = done === total && total > 0 ? '#38a169' : '#6b46c1';
+}
+
+async function runQueue() {
+    if (!analysisQueue.length) return;
+    const total  = analysisQueue.length;
+    const runBtn = document.getElementById('runQueueBtn');
+    runBtn.disabled = true;
+    runBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Ejecutando…';
+    document.getElementById('queuePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setQueueProgress(0, total, 'Preparando cola…');
+
+    let completed = 0;
+    for (let i = 0; i < analysisQueue.length; i++) {
+        const item = analysisQueue[i];
+        const statusEl = document.getElementById('qstatus-' + i);
+        const itemEl   = document.getElementById('qitem-'   + i);
+        if (statusEl) statusEl.innerHTML = '<span class="text-primary"><i class="fas fa-circle-notch fa-spin me-1"></i>Ejecutando…</span>';
+        if (itemEl)   { itemEl.classList.add('running'); itemEl.draggable = false; }
+
+        setQueueProgress(completed, total, 'Analizando: ' + (item.species || 'especie ' + (i+1)));
+        window.currentTaxonomy = item.taxonomy;
+
+        try {
+            await runSingleItem(item);
+            completed++;
+            if (statusEl) statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check me-1"></i>Completado</span>';
+            if (itemEl)   { itemEl.classList.remove('running'); itemEl.classList.add('done'); }
+        } catch(err) {
+            completed++;  // count as processed even on error
+            if (statusEl) statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-times me-1"></i>Error</span>';
+            if (itemEl)   { itemEl.classList.remove('running'); itemEl.classList.add('error'); }
+            appendLog('error', 'Error en "' + item.species + '": ' + err.message);
+        }
+        setQueueProgress(completed, total, completed === total ? '¡Cola completada!' : 'Analizando: ' + (analysisQueue[i+1]?.species || '…'));
+    }
+
+    runBtn.disabled = false;
+    runBtn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Ejecutar cola';
+    checkServerStatus();
 }
 
 // ── Pipeline + SSE ──
 let currentES = null;
 
+// Runs one item, returns a Promise that resolves when SSE 'done' arrives
+function runSingleItem(item) {
+    return new Promise(async (resolve, reject) => {
+        const panel = document.getElementById('progressPanel');
+        panel.style.display = 'block';
+        document.getElementById('logBox').innerHTML = '';
+        document.getElementById('summaryBox').classList.add('d-none');
+        setStatus('running', 'Subiendo archivos…');
+        document.getElementById('retryPanel').style.display = 'none';
+        if (currentES) { currentES.close(); currentES = null; }
+
+        const formData = new FormData();
+        formData.append('nombreEspecie', item.species);
+        formData.append('refName',       item.refName);
+        formData.append('refSequence',   item.refSequence);
+        item.files.forEach(f => formData.append('genomeFiles', f));
+        if (item.blastEvalue)       formData.append('blastEvalue',       item.blastEvalue);
+        if (item.blastPercIdentity) formData.append('blastPercIdentity', item.blastPercIdentity);
+
+        try {
+            appendLog('info', '[' + escHtml(item.species) + '] Subiendo ' + item.files.length + ' archivo(s)…');
+            const res = await fetch('/prnp-orthominer/start', { method: 'POST', body: formData });
+            const { job_id, error } = await res.json();
+            if (error) { setStatus('error', 'Error'); reject(new Error(error)); return; }
+            setStatus('running', 'Analizando "' + item.species + '"…');
+            currentJobId = job_id;
+            showCancelBtn();
+
+            currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
+            let _sseReconnectTimer = null;
+
+            function _clearSseTimer() { clearTimeout(_sseReconnectTimer); _sseReconnectTimer = null; }
+
+            currentES.onmessage = (e) => {
+                _clearSseTimer();  // got a message → connection alive, cancel any pending timeout
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'ping')   { return; }  // keepalive — solo resetear timer
+                if (msg.type === 'closed') { currentES.close(); resetBtn(); resolve(); return; }
+                if (msg.type === 'result') { appendResult(msg.message); return; }
+                appendLog(msg.type, msg.message);
+                if (msg.type === 'done') {
+                    setStatus('done', 'Completado');
+                    document.getElementById('summaryText').textContent = msg.message;
+                    document.getElementById('summaryBox').classList.remove('d-none');
+                    currentES.close(); resetBtn();
+                    if (resultCount === 0) showRetryPanel(job_id);
+                    resolve();
+                } else if (msg.type === 'error') {
+                    setStatus('error', 'Error');
+                }
+            };
+            currentES.onerror = () => {
+                if (_sseReconnectTimer) return;  // already waiting
+                appendLog('warning', 'Conexi\u00f3n SSE interrumpida. Reconectando\u2026');
+                setStatus('running', 'Reconectando\u2026');
+                _sseReconnectTimer = setTimeout(() => {
+                    appendLog('error', 'No se pudo reconectar tras 90 segundos. An\u00e1lisis interrumpido.');
+                    setStatus('error', 'Error de conexi\u00f3n');
+                    currentES.close(); resetBtn();
+                    reject(new Error('Conexi\u00f3n SSE perdida'));
+                }, 90000);
+            };
+        } catch(err) {
+            appendLog('error', 'Error de red: ' + err);
+            setStatus('error', 'Error');
+            resetBtn();
+            reject(err);
+        }
+    });
+}
+
+// "Ejecutar ahora" — single quick run without queue
 async function startAnalysis() {
     if (!validate()) return;
-
-    const refName     = window.tomSelect ? window.tomSelect.getValue()
-                                         : document.getElementById('refPrP').value;
-    const seqData     = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
-    const refSequence = seqData ? seqData.sequence.replace(/\s/g, '') : '';
-
-    const payload = {
-        rutaBase:      document.getElementById('rutaBase').value.trim(),
-        nombreEspecie: document.getElementById('nombreEspecie').value.trim(),
-        refName,
-        refSequence,
-        rutaSalida:    document.getElementById('rutaSalida').value.trim()
-    };
-
-    const panel = document.getElementById('progressPanel');
-    panel.style.display = 'block';
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    document.getElementById('logBox').innerHTML = '';
-    document.getElementById('summaryBox').classList.add('d-none');
-    setStatus('running', 'Ejecutando\u2026');
-    document.getElementById('resultsPanel').style.display = 'none';
-    document.getElementById('resultsContainer').innerHTML =
-        '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>'
-        + 'Los resultados aparecer\u00e1n aqu\u00ed al terminar el an\u00e1lisis.</p>';
-
-    const btn = document.getElementById('startBtn');
+    const item = getFormItem();
+    if (!item.files.length) { alert('Selecciona al menos un archivo .gz.'); return; }
+    window.currentTaxonomy = item.taxonomy;
+    const btn = document.getElementById('addToQueueBtn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Analizando\u2026';
-
-    if (currentES) { currentES.close(); currentES = null; }
-
     try {
-        const res = await fetch('/prnp-orthominer/start', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(payload)
-        });
-        const { job_id, error } = await res.json();
-        if (error) { appendLog('error', error); setStatus('error', 'Error'); resetBtn(); return; }
-
-        currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
-        currentES.onmessage = (e) => {
-            const msg = JSON.parse(e.data);
-            if (msg.type === 'closed') { currentES.close(); resetBtn(); return; }
-            if (msg.type === 'result') { appendResult(msg.message); return; }
-            appendLog(msg.type, msg.message);
-            if (msg.type === 'done') {
-                setStatus('done', 'Completado');
-                document.getElementById('summaryText').textContent = msg.message;
-                document.getElementById('summaryBox').classList.remove('d-none');
-                currentES.close(); resetBtn();
-            } else if (msg.type === 'error') {
-                setStatus('error', 'Error');
-            }
-        };
-        currentES.onerror = () => {
-            appendLog('error', 'Conexi\u00f3n SSE interrumpida.');
-            setStatus('error', 'Error de conexi\u00f3n');
-            resetBtn();
-        };
-    } catch(err) {
-        appendLog('error', 'Error de red: ' + err);
-        setStatus('error', 'Error');
-        resetBtn();
+        await runSingleItem(item);
+    } finally {
+        btn.disabled = false;
+        checkServerStatus();
     }
 }
 
-// Bootstrap tooltips
+function connectSSE(job_id) {
+    // Legacy wrapper used by retry panel
+    if (currentES) { currentES.close(); currentES = null; }
+    currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
+    let _sseReconnectTimer = null;
+
+    currentES.onmessage = (e) => {
+        clearTimeout(_sseReconnectTimer); _sseReconnectTimer = null;
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'ping')   { return; }  // keepalive — solo resetear timer
+        if (msg.type === 'closed') { currentES.close(); resetBtn(); return; }
+        if (msg.type === 'result') { appendResult(msg.message); return; }
+        appendLog(msg.type, msg.message);
+        if (msg.type === 'done') {
+            setStatus('done', 'Completado');
+            document.getElementById('summaryText').textContent = msg.message;
+            document.getElementById('summaryBox').classList.remove('d-none');
+            currentES.close(); resetBtn();
+            checkServerStatus();
+            if (resultCount === 0) showRetryPanel(job_id);
+        } else if (msg.type === 'error') {
+            setStatus('error', 'Error');
+        }
+    };
+    currentES.onerror = () => {
+        if (_sseReconnectTimer) return;
+        appendLog('warning', 'Conexi\u00f3n SSE interrumpida. Reconectando\u2026');
+        setStatus('running', 'Reconectando\u2026');
+        _sseReconnectTimer = setTimeout(() => {
+            appendLog('error', 'No se pudo reconectar tras 90 segundos.');
+            setStatus('error', 'Error de conexi\u00f3n');
+            currentES.close(); resetBtn();
+        }, 90000);
+    };
+}
+
+// Bootstrap tooltips + server status on load
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(
         el => new bootstrap.Tooltip(el, { trigger: 'hover' })
     );
+    checkServerStatus();
 });
 </script>
 
@@ -620,7 +1805,13 @@ try {
     window.tomSelect.setValue(
         tsOptions.find(o => o.value === defaultKey) ? defaultKey : firstKey
     );
-    window.tomSelect.on('change', updateSeqPreview);
+    window.tomSelect.on('change', () => {
+        _editedRefSeq = null;   // reset any edits when user picks a different reference
+        // also close editor if open
+        document.getElementById('seqEditorView').style.display = 'none';
+        document.getElementById('seqPreviewView').style.display = '';
+        updateSeqPreview();
+    });
     updateSeqPreview();
 } catch(e) {
     console.error('Error cargando secuencias o Tom-Select:', e);
@@ -631,10 +1822,17 @@ function updateSeqPreview() {
     const name = window.tomSelect.getValue();
     const data = window.PRP_SEQUENCES[name];
     if (!data) return;
-    const seq = data.sequence.replace(/\s/g, '');
-    document.getElementById('seqPreviewBases').textContent = seq.substring(0, 100) + '\u2026';
-    document.getElementById('seqMeta').textContent =
-        'Grupo: ' + data.group + '  |  Longitud total: ' + seq.length + ' bp';
+    const origSeq = data.sequence.replace(/\s/g, '');
+    const displaySeq = _editedRefSeq !== null ? _editedRefSeq : origSeq;
+    document.getElementById('seqPreviewBases').textContent = displaySeq.substring(0, 100) + '\u2026';
+    if (_editedRefSeq !== null) {
+        const diff = origSeq.length - _editedRefSeq.length;
+        document.getElementById('seqMeta').textContent =
+            'Longitud: ' + _editedRefSeq.length + ' bp  |  −' + diff + ' bases vs original ✎ editada';
+    } else {
+        document.getElementById('seqMeta').textContent =
+            'Grupo: ' + data.group + '  |  Longitud total: ' + origSeq.length + ' bp';
+    }
 }
 </script>
 </body>

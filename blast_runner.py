@@ -34,6 +34,35 @@ FLANK_BP = 200          # Nucleotídos de extensión en cada extremo
 # ---------------------------------------------------------------------------
 _jobs: dict = {}
 
+# Archivos temporales conservados cuando no hay hit (para reintento)
+# {job_id: {'work_dir': str, 'species': str}}
+_kept_files: dict = {}
+
+# Jobs que han solicitado cancelación
+_cancel_flags: set = set()
+
+
+def get_kept_files(job_id: str):
+    return _kept_files.get(job_id)
+
+
+def consume_kept_files(job_id: str):
+    """Quita y devuelve la entrada sin borrar los archivos (para reintento)."""
+    return _kept_files.pop(job_id, None)
+
+
+def delete_kept_files(job_id: str) -> bool:
+    entry = _kept_files.pop(job_id, None)
+    if entry and os.path.isdir(entry['work_dir']):
+        shutil.rmtree(entry['work_dir'], ignore_errors=True)
+        return True
+    return False
+
+
+def cancel_job(job_id: str):
+    """Señala al pipeline que debe detenerse en la próxima iteración."""
+    _cancel_flags.add(job_id)
+
 
 # ---------------------------------------------------------------------------
 # Utilidades de ficheros
@@ -82,7 +111,8 @@ def _cleanup(*paths):
 # BLAST
 # ---------------------------------------------------------------------------
 
-def _blastn(genome: str, ref: str, outfmt: str, out_path: str) -> tuple:
+def _blastn(genome: str, ref: str, outfmt: str, out_path: str,
+            evalue: str = None, perc_identity: float = None) -> tuple:
     """
     Ejecuta blastn con el formato indicado.
     Devuelve (returncode, stderr).
@@ -90,6 +120,10 @@ def _blastn(genome: str, ref: str, outfmt: str, out_path: str) -> tuple:
     """
     cmd = ['blastn', '-query', genome, '-subject', ref,
            '-outfmt', outfmt, '-out', out_path]
+    if evalue:
+        cmd += ['-evalue', str(evalue)]
+    if perc_identity is not None:
+        cmd += ['-perc_identity', str(perc_identity)]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
         return r.returncode, r.stderr
@@ -104,17 +138,18 @@ def _blastn(genome: str, ref: str, outfmt: str, out_path: str) -> tuple:
         )
 
 
-def run_blast_dual(genome: str, ref: str, txt_out: str, tab_out: str) -> tuple:
+def run_blast_dual(genome: str, ref: str, txt_out: str, tab_out: str,
+                   evalue: str = None, perc_identity: float = None) -> tuple:
     """
     Ejecuta BLAST dos veces:
       1) -outfmt 1  -> informe de texto legible (compatible con el original)
       2) -outfmt 6  -> tabla de coordenadas para extracción precisa
     Devuelve (returncode, stderr) del último paso.
     """
-    rc, err = _blastn(genome, ref, '1', txt_out)
+    rc, err = _blastn(genome, ref, '1', txt_out, evalue, perc_identity)
     if rc != 0:
         return rc, err
-    rc, err = _blastn(genome, ref, '6', tab_out)
+    rc, err = _blastn(genome, ref, '6', tab_out, evalue, perc_identity)
     return rc, err
 
 
@@ -231,7 +266,7 @@ def read_fasta_sequences(fasta_path: str) -> dict:
     return seqs
 
 
-def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species: str = ''):
+def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species: str = '', ref_name: str = ''):
     """
     Extrae el locus candidato de PRNP con ±FLANK_BP bp de contexto flanqueante.
 
@@ -295,13 +330,14 @@ def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species:
     fasta_content = header + '\n' + '\n'.join(fasta_lines) + '\n'
 
     # Información genómica para mostrar en la interfaz
+    ref_line = f"\nReferencia PrP : {ref_name}" if ref_name else ""
     genomic_info = (
         f"Especie        : {species or 'Desconocida'}\n"
         f"Scaffold/Contig: {contig_id}\n"
         f"Regi\u00f3n extendida: {ext_start+1}\u2013{ext_end} (base 1)\n"
         f"Regi\u00f3n ORF     : {hit['qstart']}\u2013{hit['qend']} (coords BLAST, base 1)\n"
         f"Hebra          : {hit.get('strand', '?')}\n"
-        f"Identidad      : {hit['pident']:.1f}%\n"
+        f"Identidad      : {hit['pident']:.1f}%{ref_line}\n"
         f"E-value        : {hit['evalue']}\n"
         f"Longitud aln.  : {hit['length']} bp\n"
         f"Extensi\u00f3n      : \u00b1{FLANK_BP} bp\n"
@@ -331,7 +367,8 @@ def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species:
 # Pipeline completo (generador de eventos de progreso)
 # ---------------------------------------------------------------------------
 
-def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path):
+def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path, job_id='',
+                        evalue=None, perc_identity=None):
     """
     Generador que ejecuta el pipeline paso a paso.
     Emite tuplas (event_type, message) con tipos:
@@ -343,14 +380,29 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
     yield 'info',  f'Ruta base      : {base_path}'
     yield 'info',  f'Ruta salida    : {output_path}'
     yield 'info',  f'Extensión flanq.: ±{FLANK_BP} bp'
+    if evalue or perc_identity is not None:
+        params_str = []
+        if evalue: params_str.append(f'e-value={evalue}')
+        if perc_identity is not None: params_str.append(f'identidad≥{perc_identity}%')
+        yield 'info', f'Parámetros BLAST: {", ".join(params_str)}'
+
+    species_path = os.path.join(base_path.rstrip('/\\'), species)
 
     if not os.path.isdir(base_path):
-        yield 'error', f'Ruta base no encontrada: {base_path}'
+        yield 'error', (
+            f'Ruta base no encontrada: {base_path} — '
+            f'Recuerda que el análisis corre en el servidor; '
+            f'las rutas deben ser accesibles desde el servidor, no desde tu máquina local.'
+        )
+        return
+
+    if not os.path.isdir(species_path):
+        yield 'error', f'Directorio de especie no encontrado: {species_path}'
         return
 
     gz_files = find_gz_files(base_path, species)
     if not gz_files:
-        yield 'error', f'Sin archivos .gz en: {os.path.join(base_path, species)}'
+        yield 'error', f'Sin archivos .gz en: {species_path}'
         return
 
     total = len(gz_files)
@@ -366,6 +418,10 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
     errors = 0
 
     for i, gz_file in enumerate(gz_files):
+        if job_id in _cancel_flags:
+            _cancel_flags.discard(job_id)
+            yield 'warning', 'Análisis cancelado por el usuario.'
+            break
         filename  = os.path.basename(gz_file)
         base_name = filename[:-3] if filename.endswith('.gz') else filename
         yield 'progress', f'[{i+1}/{total}]  {filename}'
@@ -388,7 +444,8 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
         # 2. BLAST (x2) -----------------------------------------------------
         try:
             yield 'step', 'Ejecutando BLAST (informe de texto + tabla de coordenadas)…'
-            rc, stderr = run_blast_dual(genome_path, ref_fasta, txt_blast, tab_blast)
+            rc, stderr = run_blast_dual(genome_path, ref_fasta, txt_blast, tab_blast,
+                                        evalue=evalue, perc_identity=perc_identity)
             if rc != 0:
                 yield 'error', f'BLAST falló ({filename}): {stderr[:300]}'
                 errors += 1
@@ -421,26 +478,27 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
                 yield 'warning', 'No se leyeron coordenadas del output tabular; FASTA no generado.'
                 no_hit += 1
             else:
-                result = extract_extended_fasta(genome_path, hit, out_fasta, species)
+                result = extract_extended_fasta(genome_path, hit, out_fasta, species, ref_name)
                 if result:
                     found += 1
-                    yield 'success', (
-                        f'¡Locus PRNP encontrado! '
+                    coords_summary = (
                         f'contig={hit["qseqid"]} | '
                         f'coords={hit["qstart"]}-{hit["qend"]} | '
                         f'identidad={hit["pident"]:.1f}% | '
                         f'e-value={hit["evalue"]}'
                     )
-                    yield 'success', (
-                        f'  → {base_name}_output.txt   '
-                        f'  → {base_name}_outputFA.fasta'
-                    )
+                    yield 'success', f'\u00a1Locus PRNP encontrado! {coords_summary}'
                     yield 'result', {
-                        'species':       species,
-                        'genome_file':   base_name,
-                        'fasta_content': result['fasta_content'],
-                        'genomic_info':  result['genomic_info']
+                        'species':        species,
+                        'genome_file':    base_name,
+                        'ref_name':       ref_name,
+                        'coords_summary': coords_summary,
+                        'fasta_content':  result['fasta_content'],
+                        'genomic_info':   result['genomic_info']
                     }
+                    _cleanup(genome_path, txt_blast, tab_blast)
+                    yield 'info', 'Análisis detenido: locus encontrado. Archivos temporales eliminados.'
+                    break   # parar al primer hit
                 else:
                     yield 'warning', 'No se pudo extraer la secuencia del contig del genoma.'
                     no_hit += 1
@@ -464,22 +522,42 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
 # API pública: jobs asíncronos con cola
 # ---------------------------------------------------------------------------
 
-def start_job(base_path, species, ref_name, ref_sequence, output_path) -> str:
-    """Lanza el pipeline en un hilo background y devuelve el job_id."""
+def start_job(base_path, species, ref_name, ref_sequence, output_path,
+              cleanup_dir=None, evalue=None, perc_identity=None) -> str:
+    """Lanza el pipeline en un hilo background y devuelve el job_id.
+
+    Si se pasa cleanup_dir, ese directorio se borra automáticamente
+    al finalizar el pipeline (usado en modo subida de archivos).
+    """
     job_id = uuid.uuid4().hex[:8]
     q: queue.Queue = queue.Queue()
     _jobs[job_id] = q
 
     def worker():
+        hit_found = False
         try:
             for etype, msg in _pipeline_generator(
-                base_path, species, ref_name, ref_sequence, output_path
+                base_path, species, ref_name, ref_sequence, output_path, job_id,
+                evalue=evalue, perc_identity=perc_identity
             ):
                 q.put({'type': etype, 'message': msg})
+                if etype == 'result':
+                    hit_found = True
         except Exception as e:
             q.put({'type': 'error', 'message': str(e)})
         finally:
             q.put(None)   # sentinel — fin del stream
+            if cleanup_dir:
+                if hit_found:
+                    # Hit encontrado: los archivos ya se borraron en el generator
+                    # (solo queda el directorio vacío)
+                    shutil.rmtree(cleanup_dir, ignore_errors=True)
+                else:
+                    # Sin hit: conservar archivos para posible reintento
+                    _kept_files[job_id] = {
+                        'work_dir': cleanup_dir,
+                        'species':  species
+                    }
 
     threading.Thread(target=worker, daemon=True).start()
     return job_id
