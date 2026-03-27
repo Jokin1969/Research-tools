@@ -108,29 +108,67 @@
         <div class="form-card">
           <h4><i class="fas fa-sliders-h me-2"></i>Parámetros del análisis</h4>
 
-          <!-- Especie + subida de archivos -->
-          <div class="mb-3">
-            <label class="form-label" for="nombreEspecie">
-              Nombre de la especie
-              <span class="tooltip-icon" data-bs-toggle="tooltip"
-                title="Nombre de la especie analizada. Se usa para nombrar los resultados.">
-                <i class="fas fa-question-circle"></i></span>
-            </label>
-            <div class="input-group">
-              <span class="input-group-text"><i class="fas fa-paw"></i></span>
-              <input type="text" class="form-control" id="nombreEspecie"
-                     placeholder="Ej: Myotis velifer">
+          <!-- Ruta base + especie -->
+          <div class="row g-3 mb-1">
+            <div class="col-md-6">
+              <label class="form-label" for="rutaBase">
+                Ruta base de trabajo
+                <span class="tooltip-icon" data-bs-toggle="tooltip"
+                  title="Directorio raíz donde están tus genomas. Solo para referencia — úsala para navegar a esa carpeta y arrastrar los ficheros.">
+                  <i class="fas fa-question-circle"></i></span>
+              </label>
+              <div class="input-group">
+                <button class="btn btn-outline-secondary" type="button"
+                        onclick="fillExamplePath()" title="Usar ruta de ejemplo: F:\WGS\">
+                  <i class="fas fa-folder-open"></i>
+                </button>
+                <input type="text" class="form-control" id="rutaBase"
+                       placeholder="Ej: F:\WGS\" oninput="updatePathPreview()">
+              </div>
             </div>
-            <div class="help-text">Nombre de la especie (se usará en el encabezado del FASTA resultante).</div>
+            <div class="col-md-6">
+              <label class="form-label" for="nombreEspecie">
+                Nombre de la especie
+                <span class="tooltip-icon" data-bs-toggle="tooltip"
+                  title="Se usará en el encabezado del FASTA resultante.">
+                  <i class="fas fa-question-circle"></i></span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-paw"></i></span>
+                <input type="text" class="form-control" id="nombreEspecie"
+                       placeholder="Ej: Myotis velifer" oninput="updatePathPreview()">
+              </div>
+            </div>
           </div>
 
+          <!-- Path preview + copiar -->
+          <div class="path-preview-box mb-3" id="pathPreviewBox">
+            <span class="path-preview-label"><i class="fas fa-map-marker-alt me-1"></i>Ruta de trabajo:</span>
+            <code id="pathPreviewText" class="path-preview-value">Rellena los campos anteriores…</code>
+            <button class="btn btn-outline-secondary btn-sm ms-2 py-0" id="copyPathBtn"
+                    onclick="copyPath()" title="Copiar ruta al portapapeles" style="display:none">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+
+          <!-- Archivos .gz -->
           <div class="mb-1">
             <label class="form-label">
               Archivos de genoma (.gz)
               <span class="tooltip-icon" data-bs-toggle="tooltip"
-                title="Selecciona uno o más ensamblajes de genoma comprimidos (.gz). Se subirán al servidor, se analizarán y se borrarán automáticamente.">
+                title="Arrastra ficheros, selecciónalos uno a uno, o carga toda la carpeta de golpe.">
                 <i class="fas fa-question-circle"></i></span>
             </label>
+            <div class="d-flex gap-2 mb-2">
+              <button class="btn btn-outline-secondary btn-sm" type="button"
+                      onclick="document.getElementById('folderInput').click()"
+                      title="Abre la carpeta y carga todos los .gz que haya dentro">
+                <i class="fas fa-folder-open me-1"></i>Cargar carpeta completa
+              </button>
+              <input type="file" id="folderInput" multiple accept=".gz"
+                     webkitdirectory style="display:none"
+                     onchange="handleFiles(this.files)">
+            </div>
             <div class="upload-zone" id="uploadZone"
                  onclick="document.getElementById('fileInput').click()"
                  ondragover="onDragOver(event)"
@@ -139,7 +177,7 @@
               <input type="file" id="fileInput" multiple accept=".gz"
                      style="display:none" onchange="handleFiles(this.files)">
               <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
-              <p><strong>Arrastra archivos .gz aquí</strong> o haz clic para seleccionar</p>
+              <p><strong>Arrastra archivos .gz aquí</strong> o haz clic para seleccionar ficheros sueltos</p>
               <p class="mt-1" style="font-size:0.78rem;">Se borrarán del servidor automáticamente tras el análisis</p>
             </div>
             <div class="file-list" id="fileList"></div>
@@ -268,6 +306,51 @@
 
 <!-- ── Bloque 1: funciones UI independientes (no dependen de datos Flask) ── -->
 <script>
+// ── Ruta de referencia (solo visual) ──
+function normalizePath(p) {
+    p = p.trim();
+    if (p && !p.endsWith('\\') && !p.endsWith('/')) {
+        p += p.includes('\\') ? '\\' : '/';
+    }
+    return p;
+}
+
+function fillExamplePath() {
+    document.getElementById('rutaBase').value = 'F:\\WGS\\';
+    updatePathPreview();
+}
+
+function updatePathPreview() {
+    const base    = document.getElementById('rutaBase').value;
+    const species = document.getElementById('nombreEspecie').value.trim();
+    const norm    = normalizePath(base);
+    const full    = norm + species;
+    const txt     = document.getElementById('pathPreviewText');
+    const btn     = document.getElementById('copyPathBtn');
+    const box     = document.getElementById('pathPreviewBox');
+    if (base.trim() || species) {
+        txt.textContent = normalizePath(full) || '\u2014';
+        box.classList.add('path-preview-active');
+        btn.style.display = '';
+    } else {
+        txt.textContent = 'Rellena los campos anteriores\u2026';
+        box.classList.remove('path-preview-active');
+        btn.style.display = 'none';
+    }
+}
+
+function copyPath() {
+    const path = document.getElementById('pathPreviewText').textContent;
+    navigator.clipboard.writeText(path)
+        .then(() => {
+            const btn = document.getElementById('copyPathBtn');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => { btn.innerHTML = orig; }, 1500);
+        })
+        .catch(() => alert('No se pudo copiar.'));
+}
+
 // ── Subida de archivos ──
 let selectedFiles = [];
 

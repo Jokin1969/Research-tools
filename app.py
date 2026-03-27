@@ -195,8 +195,12 @@ def prnp_stream(job_id):
     def generate():
         try:
             while True:
-                msg = q.get(timeout=120)
-                if msg is None:                    # sentinel: pipeline terminado
+                try:
+                    msg = q.get(timeout=15)   # espera max 15 s
+                except Exception:
+                    yield ": keepalive\n\n"   # comentario SSE — mantiene la conexión viva
+                    continue
+                if msg is None:               # sentinel: pipeline terminado
                     yield f"data: {json.dumps({'type': 'closed'})}\n\n"
                     break
                 yield f"data: {json.dumps(msg, ensure_ascii=False)}\n\n"
