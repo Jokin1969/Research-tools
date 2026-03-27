@@ -58,6 +58,14 @@
         .status-error   { background:#fed7d7; color:#742a2a; }
         .pulse { animation: pulse-anim 1.2s infinite; }
         @keyframes pulse-anim { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        /* ── Queue panel ── */
+        .queue-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid #e9d8fd; border-radius:8px; margin-bottom:8px; background:#faf5ff; flex-wrap:wrap; }
+        .queue-item.running { border-color:#6b46c1; background:#f3e8ff; }
+        .queue-item.done    { border-color:#9ae6b4; background:#f0fff4; opacity:.75; }
+        .queue-item.error   { border-color:#fc8181; background:#fff5f5; }
+        .queue-item-name  { font-weight:700; color:#2d3748; flex:1; min-width:120px; }
+        .queue-item-meta  { font-size:.78rem; color:#718096; }
+        .queue-item-status { font-size:.78rem; font-weight:600; }
         /* ── Server status panel ── */
         #serverStatusPanel { background:#fff8f0; border:1px solid #f6ad55; border-radius:10px; padding:10px 16px; font-size:0.82rem; }
         /* ── Retry panel ── */
@@ -274,8 +282,11 @@
 
           <!-- Start button -->
           <div class="d-flex align-items-center gap-3 flex-wrap">
-            <button class="btn btn-generate btn-generate-purple" id="startBtn" onclick="startAnalysis()">
-              <i class="fas fa-play-circle me-2"></i>Iniciar Análisis
+            <button class="btn btn-generate btn-generate-purple" id="addToQueueBtn" onclick="addToQueue()">
+              <i class="fas fa-plus-circle me-2"></i>Añadir a cola
+            </button>
+            <button class="btn btn-outline-secondary" id="startBtn" onclick="startAnalysis()" style="display:none">
+              <i class="fas fa-play-circle me-2"></i>Ejecutar ahora
             </button>
             <span class="dev-badge">
               <i class="fas fa-flask me-1"></i>BLAST+ requerido en el servidor
@@ -304,6 +315,24 @@
             <li><span class="fmt-badge">GZ</span> Archivos comprimidos (descompresión automática)</li>
           </ul>
         </div>
+      </div>
+    </div>
+
+    <!-- Queue Panel -->
+    <div id="queuePanel" class="mt-4" style="display:none">
+      <div class="form-card">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <h4 class="mb-0"><i class="fas fa-layer-group me-2"></i>Cola de análisis &nbsp;<span class="badge rounded-pill bg-purple" id="queueCount" style="background:#6b46c1">0</span></h4>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" onclick="clearQueue()">
+              <i class="fas fa-times me-1"></i>Vaciar cola
+            </button>
+            <button class="btn btn-generate btn-generate-purple btn-sm" id="runQueueBtn" onclick="runQueue()">
+              <i class="fas fa-play-circle me-2"></i>Ejecutar cola
+            </button>
+          </div>
+        </div>
+        <div id="queueList"></div>
       </div>
     </div>
 
@@ -1172,60 +1201,178 @@ async function deleteKeptFiles() {
     currentJobId = null;
 }
 
-// ── Pipeline + SSE ──
-let currentES = null;
+// ── Cola de análisis ──
+let analysisQueue = [];  // [{ species, files, refName, refSequence, taxonomy }]
 
-async function startAnalysis() {
-    if (!validate()) return;
-
+function getFormItem() {
     const refName     = window.tomSelect ? window.tomSelect.getValue()
                                          : document.getElementById('refPrP').value;
     const seqData     = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
     const refSequence = seqData ? seqData.sequence.replace(/\s/g, '') : '';
     const species     = document.getElementById('nombreEspecie').value.trim();
+    return { species, files: [...selectedFiles], refName, refSequence,
+             taxonomy: window.currentTaxonomy ? { ...window.currentTaxonomy } : null };
+}
 
-    const panel = document.getElementById('progressPanel');
-    panel.style.display = 'block';
-    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    document.getElementById('logBox').innerHTML = '';
+function addToQueue() {
+    if (!validate()) return;
+    const item = getFormItem();
+    if (!item.files.length) { alert('Selecciona al menos un archivo .gz.'); return; }
+    analysisQueue.push(item);
+    renderQueue();
+    // Reset form for next species
+    document.getElementById('nombreEspecie').value = '';
+    document.getElementById('rutaBase').value = '';
+    updatePathPreview();
+    hideTaxonomy();
+    selectedFiles = [];
+    renderFileList();
     document.getElementById('summaryBox').classList.add('d-none');
-    setStatus('running', 'Subiendo archivos\u2026');
-    document.getElementById('retryPanel').style.display = 'none';
-    // NO limpiamos resultsContainer para encadenar estudios
+}
 
-    const btn = document.getElementById('startBtn');
+function removeFromQueue(i) {
+    analysisQueue.splice(i, 1);
+    renderQueue();
+}
+
+function clearQueue() {
+    analysisQueue = [];
+    renderQueue();
+}
+
+function renderQueue() {
+    const panel = document.getElementById('queuePanel');
+    const list  = document.getElementById('queueList');
+    const count = document.getElementById('queueCount');
+    count.textContent = analysisQueue.length;
+    if (!analysisQueue.length) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    list.innerHTML = analysisQueue.map((item, i) =>
+        '<div class="queue-item" id="qitem-' + i + '">'
+      + '<span class="queue-item-name"><i class="fas fa-paw me-1 text-secondary"></i>'
+      +   escHtml(item.species || '(sin nombre)') + '</span>'
+      + '<span class="queue-item-meta">'
+      +   item.files.length + ' archivo' + (item.files.length > 1 ? 's' : '')
+      +   ' &nbsp;·&nbsp; ' + escHtml(item.refName || '—')
+      + '</span>'
+      + '<span class="queue-item-status" id="qstatus-' + i + '"></span>'
+      + '<button class="btn btn-outline-danger btn-sm btn-copy-sm ms-auto" onclick="removeFromQueue(' + i + ')">'
+      +   '<i class="fas fa-times"></i></button>'
+      + '</div>'
+    ).join('');
+}
+
+async function runQueue() {
+    if (!analysisQueue.length) return;
+    const runBtn = document.getElementById('runQueueBtn');
+    runBtn.disabled = true;
+    runBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Ejecutando…';
+    document.getElementById('queuePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    for (let i = 0; i < analysisQueue.length; i++) {
+        const item = analysisQueue[i];
+        const statusEl = document.getElementById('qstatus-' + i);
+        const itemEl   = document.getElementById('qitem-'   + i);
+        if (statusEl) statusEl.innerHTML = '<span class="text-primary"><i class="fas fa-circle-notch fa-spin me-1"></i>Ejecutando…</span>';
+        if (itemEl)   itemEl.classList.add('running');
+
+        // Set taxonomy context for result badges
+        window.currentTaxonomy = item.taxonomy;
+
+        try {
+            await runSingleItem(item);
+            if (statusEl) statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check me-1"></i>Completado</span>';
+            if (itemEl)   { itemEl.classList.remove('running'); itemEl.classList.add('done'); }
+        } catch(err) {
+            if (statusEl) statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-times me-1"></i>Error</span>';
+            if (itemEl)   { itemEl.classList.remove('running'); itemEl.classList.add('error'); }
+            appendLog('error', 'Error en "' + item.species + '": ' + err.message);
+        }
+    }
+
+    runBtn.disabled = false;
+    runBtn.innerHTML = '<i class="fas fa-play-circle me-2"></i>Ejecutar cola';
+    checkServerStatus();
+}
+
+// ── Pipeline + SSE ──
+let currentES = null;
+
+// Runs one item, returns a Promise that resolves when SSE 'done' arrives
+function runSingleItem(item) {
+    return new Promise(async (resolve, reject) => {
+        const panel = document.getElementById('progressPanel');
+        panel.style.display = 'block';
+        document.getElementById('logBox').innerHTML = '';
+        document.getElementById('summaryBox').classList.add('d-none');
+        setStatus('running', 'Subiendo archivos…');
+        document.getElementById('retryPanel').style.display = 'none';
+        if (currentES) { currentES.close(); currentES = null; }
+
+        const formData = new FormData();
+        formData.append('nombreEspecie', item.species);
+        formData.append('refName',       item.refName);
+        formData.append('refSequence',   item.refSequence);
+        item.files.forEach(f => formData.append('genomeFiles', f));
+
+        try {
+            appendLog('info', '[' + escHtml(item.species) + '] Subiendo ' + item.files.length + ' archivo(s)…');
+            const res = await fetch('/prnp-orthominer/start', { method: 'POST', body: formData });
+            const { job_id, error } = await res.json();
+            if (error) { setStatus('error', 'Error'); reject(new Error(error)); return; }
+            setStatus('running', 'Analizando "' + item.species + '"…');
+            currentJobId = job_id;
+
+            currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
+            currentES.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'closed') { currentES.close(); resetBtn(); resolve(); return; }
+                if (msg.type === 'result') { appendResult(msg.message); return; }
+                appendLog(msg.type, msg.message);
+                if (msg.type === 'done') {
+                    setStatus('done', 'Completado');
+                    document.getElementById('summaryText').textContent = msg.message;
+                    document.getElementById('summaryBox').classList.remove('d-none');
+                    currentES.close(); resetBtn();
+                    if (resultCount === 0) showRetryPanel(job_id);
+                    resolve();
+                } else if (msg.type === 'error') {
+                    setStatus('error', 'Error');
+                }
+            };
+            currentES.onerror = () => {
+                appendLog('error', 'Conexión SSE interrumpida.');
+                setStatus('error', 'Error de conexión');
+                resetBtn();
+                reject(new Error('Conexión SSE interrumpida'));
+            };
+        } catch(err) {
+            appendLog('error', 'Error de red: ' + err);
+            setStatus('error', 'Error');
+            resetBtn();
+            reject(err);
+        }
+    });
+}
+
+// "Ejecutar ahora" — single quick run without queue
+async function startAnalysis() {
+    if (!validate()) return;
+    const item = getFormItem();
+    if (!item.files.length) { alert('Selecciona al menos un archivo .gz.'); return; }
+    window.currentTaxonomy = item.taxonomy;
+    const btn = document.getElementById('addToQueueBtn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Subiendo\u2026';
-
-    if (currentES) { currentES.close(); currentES = null; }
-
-    // Construir FormData con archivos
-    const formData = new FormData();
-    formData.append('nombreEspecie', species);
-    formData.append('refName',       refName);
-    formData.append('refSequence',   refSequence);
-    selectedFiles.forEach(f => formData.append('genomeFiles', f));
-
     try {
-        appendLog('info', 'Subiendo ' + selectedFiles.length + ' archivo(s) al servidor\u2026');
-        const res = await fetch('/prnp-orthominer/start', {
-            method: 'POST',
-            body:   formData
-        });
-        const { job_id, error } = await res.json();
-        if (error) { appendLog('error', error); setStatus('error', 'Error'); resetBtn(); return; }
-        setStatus('running', 'Ejecutando\u2026');
-        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Analizando\u2026';
-        currentJobId = job_id;
-        connectSSE(job_id);
-    } catch(err) {
-        appendLog('error', 'Error de red: ' + err);
-        setStatus('error', 'Error');
-        resetBtn();
+        await runSingleItem(item);
+    } finally {
+        btn.disabled = false;
+        checkServerStatus();
     }
 }
 
 function connectSSE(job_id) {
+    // Legacy wrapper used by retry panel
     if (currentES) { currentES.close(); currentES = null; }
     currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
     currentES.onmessage = (e) => {
@@ -1238,16 +1385,15 @@ function connectSSE(job_id) {
             document.getElementById('summaryText').textContent = msg.message;
             document.getElementById('summaryBox').classList.remove('d-none');
             currentES.close(); resetBtn();
-            checkServerStatus();  // Refresh server file count
-            // Si no se encontró ningún hit, ofrecer reintento
+            checkServerStatus();
             if (resultCount === 0) showRetryPanel(job_id);
         } else if (msg.type === 'error') {
             setStatus('error', 'Error');
         }
     };
     currentES.onerror = () => {
-        appendLog('error', 'Conexi\u00f3n SSE interrumpida.');
-        setStatus('error', 'Error de conexi\u00f3n');
+        appendLog('error', 'Conexión SSE interrumpida.');
+        setStatus('error', 'Error de conexión');
         resetBtn();
     };
 }
