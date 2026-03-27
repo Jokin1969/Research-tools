@@ -27,6 +27,13 @@
         .file-item .file-name { flex:1; color:#2d3748; font-family:'Courier New',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .file-item .file-size { color:#718096; flex-shrink:0; }
         .file-item .file-remove { color:#e53e3e; cursor:pointer; flex-shrink:0; border:none; background:none; padding:0 2px; }
+        /* ── Taxonomy panel ── */
+        #taxoPanel { border-color:#d6bcfa !important; background:#faf5ff !important; }
+        #taxoPanel strong { color:#44337a; }
+        #speciesSuggestions .dropdown-item { cursor:pointer; padding:5px 12px; }
+        #speciesSuggestions .dropdown-item:hover, #speciesSuggestions .dropdown-item.active { background:#f3e8ff; color:#44337a; }
+        #speciesSuggestions .suggest-species { font-style:italic; }
+        #speciesSuggestions .suggest-meta { font-size:.78rem; color:#718096; }
         /* ── Sequence preview ── */
         .seq-preview-box { background:#faf5ff; border:1px solid #d6bcfa; border-radius:10px; padding:14px 16px; margin-top:10px; }
         .seq-preview-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; color:#6b46c1; letter-spacing:0.5px; margin-bottom:6px; }
@@ -134,13 +141,27 @@
               <label class="form-label" for="nombreEspecie">
                 Nombre de la especie
                 <span class="tooltip-icon" data-bs-toggle="tooltip"
-                  title="Se usará en el encabezado del FASTA resultante.">
+                  title="Escribe el nombre científico (género + especie). Se consultará la base de datos taxonómica.">
                   <i class="fas fa-question-circle"></i></span>
               </label>
               <div class="input-group">
                 <span class="input-group-text"><i class="fas fa-paw"></i></span>
                 <input type="text" class="form-control" id="nombreEspecie"
-                       placeholder="Ej: Myotis velifer" oninput="updatePathPreview()">
+                       placeholder="Ej: Myotis velifer" autocomplete="off"
+                       oninput="updatePathPreview(); onSpeciesInput(this.value)">
+                <div id="speciesSuggestions" class="dropdown-menu shadow-sm"
+                     style="display:none; position:absolute; top:100%; left:0; right:0; z-index:1050; max-height:200px; overflow-y:auto; font-size:.875rem;"></div>
+              </div>
+              <!-- Panel taxonómico -->
+              <div id="taxoPanel" class="mt-2 p-2 rounded border bg-light small" style="display:none">
+                <div class="d-flex flex-wrap gap-3">
+                  <span><i class="fas fa-sitemap me-1 text-secondary"></i><strong>Género:</strong> <span id="taxoGenero">—</span></span>
+                  <span><i class="fas fa-layer-group me-1 text-secondary"></i><strong>Familia:</strong> <span id="taxoFamilia">—</span></span>
+                  <span><i class="fas fa-tree me-1 text-secondary"></i><strong>Orden:</strong> <span id="taxoOrden">—</span></span>
+                </div>
+                <div id="taxoSuggestion" class="mt-1 text-primary" style="display:none">
+                  <i class="fas fa-lightbulb me-1"></i><span id="taxoSuggestionText"></span>
+                </div>
               </div>
             </div>
           </div>
@@ -379,6 +400,138 @@ function updatePathPreview() {
     }
 }
 
+// ── Taxonomía ──
+let _taxoDB = null;
+let _taxoDebounce = null;
+
+async function loadTaxoDB() {
+    if (_taxoDB) return _taxoDB;
+    try {
+        const r = await fetch('/static/data/taxonomy.json');
+        _taxoDB = await r.json();
+    } catch(e) {
+        _taxoDB = {};
+    }
+    return _taxoDB;
+}
+loadTaxoDB(); // precarga en background al abrir la página
+
+// Mapeo orden+familia → nombre de referencia
+const TAXO_REF_MAP = [
+    // Chiroptera por familia
+    { orden: 'Chiroptera', familia: 'Vespertilionidae',  ref: 'Murciélago orejudo PrP' },
+    { orden: 'Chiroptera', familia: 'Phyllostomidae',    ref: 'Murciélago de hoja nasal PrP' },
+    { orden: 'Chiroptera', familia: 'Pteropodidae',      ref: 'Murciélago frugívoro PrP' },
+    { orden: 'Chiroptera', familia: 'Molossidae',        ref: 'Murciélago de alas de saco PrP' },
+    { orden: 'Chiroptera', familia: null,                ref: 'Murciélago PrP' },
+    // Rodentia por familia
+    { orden: 'Rodentia',   familia: 'Sciuridae',         ref: 'Ardilla PrP' },
+    { orden: 'Rodentia',   familia: 'Muridae',           ref: 'Rata PrP' },
+    { orden: 'Rodentia',   familia: 'Cricetidae',        ref: 'Ratón espinoso PrP' },
+    { orden: 'Rodentia',   familia: 'Arvicolidae',       ref: 'Topillo PrP' },
+    { orden: 'Rodentia',   familia: 'Spalacidae',        ref: 'Rata topo PrP' },
+    { orden: 'Rodentia',   familia: null,                ref: 'Ratón espinoso PrP' },
+    // Resto por orden
+    { orden: 'Primates',          familia: null, ref: 'Macaco PrP' },
+    { orden: 'Cetartiodactyla',   familia: null, ref: 'Oveja PrP' },
+    { orden: 'Artiodactyla',      familia: null, ref: 'Oveja PrP' },
+    { orden: 'Carnivora',         familia: null, ref: 'Gato PrP' },
+    { orden: 'Lagomorpha',        familia: null, ref: 'Conejo PrP' },
+    { orden: 'Proboscidea',       familia: null, ref: 'Elefante PrP' },
+    { orden: 'Eulipotyphla',      familia: null, ref: 'Musaraña PrP' },
+    { orden: 'Soricomorpha',      familia: null, ref: 'Musaraña PrP' },
+    // Marsupiales (varios órdenes)
+    { orden: 'Dasyuromorphia',    familia: null, ref: 'Canguro PrP' },
+    { orden: 'Diprotodontia',     familia: null, ref: 'Canguro PrP' },
+    { orden: 'Peramelemorphia',   familia: null, ref: 'Canguro PrP' },
+    { orden: 'Monotremata',       familia: null, ref: 'Canguro PrP' },
+];
+
+function suggestRef(orden, familia) {
+    for (const rule of TAXO_REF_MAP) {
+        if (rule.orden.toLowerCase() === orden.toLowerCase()) {
+            if (!rule.familia || rule.familia.toLowerCase() === familia.toLowerCase()) {
+                return rule.ref;
+            }
+        }
+    }
+    return null;
+}
+
+function applyTaxonomy(entry) {
+    document.getElementById('taxoGenero').textContent  = entry.genero;
+    document.getElementById('taxoFamilia').textContent = entry.familia;
+    document.getElementById('taxoOrden').textContent   = entry.orden;
+    document.getElementById('taxoPanel').style.display = '';
+    window.currentTaxonomy = { genero: entry.genero, familia: entry.familia, orden: entry.orden };
+
+    const ref = suggestRef(entry.orden, entry.familia);
+    const suggBox  = document.getElementById('taxoSuggestion');
+    const suggText = document.getElementById('taxoSuggestionText');
+    if (ref) {
+        suggText.textContent = 'Referencia sugerida: ' + ref;
+        suggBox.style.display = '';
+        // Pre-seleccionar en Tom-Select si ya está iniciado
+        if (window.tomSelect) {
+            try { window.tomSelect.setValue(ref); } catch(e) {}
+        }
+    } else {
+        suggBox.style.display = 'none';
+    }
+}
+
+function hideTaxonomy() {
+    document.getElementById('taxoPanel').style.display = 'none';
+    document.getElementById('speciesSuggestions').style.display = 'none';
+    window.currentTaxonomy = null;
+}
+
+async function onSpeciesInput(val) {
+    clearTimeout(_taxoDebounce);
+    const q = val.trim().toLowerCase();
+    const sugBox = document.getElementById('speciesSuggestions');
+
+    if (q.length < 3) { sugBox.style.display = 'none'; return; }
+
+    _taxoDebounce = setTimeout(async () => {
+        const db = await loadTaxoDB();
+        // Exact match
+        if (db[q]) { applyTaxonomy(db[q]); sugBox.style.display = 'none'; return; }
+
+        // Partial match: genus starts with q, or full name contains q
+        const matches = Object.values(db).filter(e =>
+            e.especie.toLowerCase().startsWith(q) || e.especie.toLowerCase().includes(q)
+        ).slice(0, 10);
+
+        if (!matches.length) { hideTaxonomy(); sugBox.style.display = 'none'; return; }
+
+        sugBox.innerHTML = matches.map(e =>
+            `<div class="dropdown-item" onclick="selectSpeciesSuggestion('${e.especie.replace(/'/g,"\\'")}')">
+                <span class="suggest-species">${e.especie}</span>
+                <span class="suggest-meta ms-2">${e.familia} · ${e.orden}</span>
+             </div>`
+        ).join('');
+        sugBox.style.display = '';
+    }, 250);
+}
+
+function selectSpeciesSuggestion(especie) {
+    document.getElementById('nombreEspecie').value = especie;
+    document.getElementById('speciesSuggestions').style.display = 'none';
+    updatePathPreview();
+    loadTaxoDB().then(db => {
+        const entry = db[especie.toLowerCase()];
+        if (entry) applyTaxonomy(entry);
+    });
+}
+
+// Ocultar sugerencias al hacer click fuera
+document.addEventListener('click', e => {
+    if (!e.target.closest('#nombreEspecie') && !e.target.closest('#speciesSuggestions')) {
+        document.getElementById('speciesSuggestions').style.display = 'none';
+    }
+});
+
 function copyPath() {
     const path = document.getElementById('pathPreviewText').textContent;
     navigator.clipboard.writeText(path)
@@ -555,6 +708,17 @@ function appendResult(data) {
     const card   = document.createElement('div');
     card.className = 'result-card';
     card.id = cardId;
+    const taxo = window.currentTaxonomy || {};
+    const taxoBadges = taxo.genero
+        ? '<div class="d-flex flex-wrap gap-2 px-3 py-2" style="background:#faf5ff;border-bottom:1px solid #e9d8fd;">'
+          + '<span class="badge rounded-pill" style="background:#e9d8fd;color:#44337a;font-weight:500">'
+          +   '<i class="fas fa-sitemap me-1"></i>' + escHtml(taxo.genero) + '</span>'
+          + '<span class="badge rounded-pill" style="background:#e9d8fd;color:#44337a;font-weight:500">'
+          +   '<i class="fas fa-layer-group me-1"></i>' + escHtml(taxo.familia) + '</span>'
+          + '<span class="badge rounded-pill" style="background:#e9d8fd;color:#44337a;font-weight:500">'
+          +   '<i class="fas fa-tree me-1"></i>' + escHtml(taxo.orden) + '</span>'
+          + '</div>'
+        : '';
     card.innerHTML =
         '<div class="result-card-header">'
       +   '<span class="result-title"><i class="fas fa-dna me-2"></i>'
@@ -565,6 +729,7 @@ function appendResult(data) {
       +     ' onclick="downloadFasta(' + resultCount + ')" title="Descargar FASTA">'
       +     '<i class="fas fa-download me-1"></i>FASTA</button>'
       + '</div>'
+      + taxoBadges
       + '<div class="result-section">'
       +   '<div class="result-section-label">'
       +     '<span><i class="fas fa-info-circle me-1"></i>Informaci\u00f3n gen\u00f3mica</span>'
