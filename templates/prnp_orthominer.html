@@ -163,15 +163,26 @@
                 title="Arrastra ficheros, selecciónalos uno a uno, o carga toda la carpeta de golpe.">
                 <i class="fas fa-question-circle"></i></span>
             </label>
-            <div class="d-flex gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
               <button class="btn btn-outline-secondary btn-sm" type="button"
+                      id="copyPathForFolderBtn"
+                      onclick="copyPathForFolder()"
+                      title="Copia la ruta de trabajo al portapapeles para pegarla en el explorador de archivos"
+                      style="display:none">
+                <i class="fas fa-copy me-1"></i>Copiar ruta
+              </button>
+              <button class="btn btn-outline-primary btn-sm" type="button"
                       onclick="document.getElementById('folderInput').click()"
-                      title="Abre la carpeta y carga todos los .gz que haya dentro">
-                <i class="fas fa-folder-open me-1"></i>Cargar carpeta completa
+                      title="Abre el selector de carpeta y carga todos los .gz que contenga">
+                <i class="fas fa-folder-open me-1"></i>Cargar carpeta
               </button>
               <input type="file" id="folderInput" multiple accept=".gz"
                      webkitdirectory style="display:none"
                      onchange="handleFiles(this.files)">
+            </div>
+            <div id="folderPathHint" class="text-muted small mb-2" style="display:none">
+              <i class="fas fa-info-circle me-1"></i>
+              Pega la ruta copiada en la barra de dirección del explorador de archivos (Ctrl+V o Ctrl+L)
             </div>
             <div class="upload-zone" id="uploadZone"
                  onclick="document.getElementById('fileInput').click()"
@@ -358,10 +369,13 @@ function updatePathPreview() {
         txt.textContent = normalizePath(full) || '\u2014';
         box.classList.add('path-preview-active');
         btn.style.display = '';
+        document.getElementById('copyPathForFolderBtn').style.display = '';
     } else {
         txt.textContent = 'Rellena los campos anteriores\u2026';
         box.classList.remove('path-preview-active');
         btn.style.display = 'none';
+        document.getElementById('copyPathForFolderBtn').style.display = 'none';
+        document.getElementById('folderPathHint').style.display = 'none';
     }
 }
 
@@ -375,6 +389,27 @@ function copyPath() {
             setTimeout(() => { btn.innerHTML = orig; }, 1500);
         })
         .catch(() => alert('No se pudo copiar.'));
+}
+
+function copyPathForFolder() {
+    const path = document.getElementById('pathPreviewText').textContent;
+    if (!path || path.includes('Rellena')) {
+        alert('Introduce primero la ruta base y el nombre de especie.');
+        return;
+    }
+    navigator.clipboard.writeText(path)
+        .then(() => {
+            const btn = document.getElementById('copyPathForFolderBtn');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check me-1"></i>¡Copiada!';
+            btn.classList.replace('btn-outline-secondary', 'btn-success');
+            document.getElementById('folderPathHint').style.display = '';
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.replace('btn-success', 'btn-outline-secondary');
+            }, 3000);
+        })
+        .catch(() => alert('No se pudo copiar la ruta.'));
 }
 
 // ── Subida de archivos ──
