@@ -203,7 +203,8 @@ def prnp_stream(job_id):
                 try:
                     msg = q.get(timeout=15)   # espera max 15 s
                 except Exception:
-                    yield ": keepalive\n\n"   # comentario SSE — mantiene la conexión viva
+                    # Ping real (no comentario) para que onmessage lo reciba y resetee timers
+                    yield f"data: {json.dumps({'type': 'ping'})}\n\n"
                     continue
                 if msg is None:               # sentinel: pipeline terminado
                     yield f"data: {json.dumps({'type': 'closed'})}\n\n"

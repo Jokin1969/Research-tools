@@ -1508,6 +1508,7 @@ function runSingleItem(item) {
             currentES.onmessage = (e) => {
                 _clearSseTimer();  // got a message → connection alive, cancel any pending timeout
                 const msg = JSON.parse(e.data);
+                if (msg.type === 'ping')   { return; }  // keepalive — solo resetear timer
                 if (msg.type === 'closed') { currentES.close(); resetBtn(); resolve(); return; }
                 if (msg.type === 'result') { appendResult(msg.message); return; }
                 appendLog(msg.type, msg.message);
@@ -1567,6 +1568,7 @@ function connectSSE(job_id) {
     currentES.onmessage = (e) => {
         clearTimeout(_sseReconnectTimer); _sseReconnectTimer = null;
         const msg = JSON.parse(e.data);
+        if (msg.type === 'ping')   { return; }  // keepalive — solo resetear timer
         if (msg.type === 'closed') { currentES.close(); resetBtn(); return; }
         if (msg.type === 'result') { appendResult(msg.message); return; }
         appendLog(msg.type, msg.message);
