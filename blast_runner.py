@@ -344,13 +344,23 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
     yield 'info',  f'Ruta salida    : {output_path}'
     yield 'info',  f'Extensión flanq.: ±{FLANK_BP} bp'
 
+    species_path = os.path.join(base_path.rstrip('/\\'), species)
+
     if not os.path.isdir(base_path):
-        yield 'error', f'Ruta base no encontrada: {base_path}'
+        yield 'error', (
+            f'Ruta base no encontrada: {base_path} — '
+            f'Recuerda que el análisis corre en el servidor; '
+            f'las rutas deben ser accesibles desde el servidor, no desde tu máquina local.'
+        )
+        return
+
+    if not os.path.isdir(species_path):
+        yield 'error', f'Directorio de especie no encontrado: {species_path}'
         return
 
     gz_files = find_gz_files(base_path, species)
     if not gz_files:
-        yield 'error', f'Sin archivos .gz en: {os.path.join(base_path, species)}'
+        yield 'error', f'Sin archivos .gz en: {species_path}'
         return
 
     total = len(gz_files)
