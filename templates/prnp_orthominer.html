@@ -59,13 +59,17 @@
         .pulse { animation: pulse-anim 1.2s infinite; }
         @keyframes pulse-anim { 0%,100%{opacity:1} 50%{opacity:0.4} }
         /* ── Queue panel ── */
-        .queue-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid #e9d8fd; border-radius:8px; margin-bottom:8px; background:#faf5ff; flex-wrap:wrap; }
-        .queue-item.running { border-color:#6b46c1; background:#f3e8ff; }
-        .queue-item.done    { border-color:#9ae6b4; background:#f0fff4; opacity:.75; }
-        .queue-item.error   { border-color:#fc8181; background:#fff5f5; }
+        .queue-item { display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid #e9d8fd; border-radius:8px; margin-bottom:8px; background:#faf5ff; flex-wrap:wrap; cursor:grab; user-select:none; }
+        .queue-item:active { cursor:grabbing; }
+        .queue-item.drag-over { border-color:#6b46c1; border-style:dashed; background:#f3e8ff; }
+        .queue-item.dragging  { opacity:.4; }
+        .queue-item.running { border-color:#6b46c1; background:#f3e8ff; cursor:default; }
+        .queue-item.done    { border-color:#9ae6b4; background:#f0fff4; opacity:.75; cursor:default; }
+        .queue-item.error   { border-color:#fc8181; background:#fff5f5; cursor:default; }
         .queue-item-name  { font-weight:700; color:#2d3748; flex:1; min-width:120px; }
         .queue-item-meta  { font-size:.78rem; color:#718096; }
         .queue-item-status { font-size:.78rem; font-weight:600; }
+        .queue-drag-handle { color:#b794f4; font-size:.9rem; flex-shrink:0; }
         /* ── Server status panel ── */
         #serverStatusPanel { background:#fff8f0; border:1px solid #f6ad55; border-radius:10px; padding:10px 16px; font-size:0.82rem; }
         /* ── Retry panel ── */
@@ -322,7 +326,7 @@
     <div id="queuePanel" class="mt-4" style="display:none">
       <div class="form-card">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-          <h4 class="mb-0"><i class="fas fa-layer-group me-2"></i>Cola de análisis &nbsp;<span class="badge rounded-pill bg-purple" id="queueCount" style="background:#6b46c1">0</span></h4>
+          <h4 class="mb-0"><i class="fas fa-layer-group me-2"></i>Cola de análisis &nbsp;<span class="badge rounded-pill" id="queueCount" style="background:#6b46c1;color:#fff">0</span></h4>
           <div class="d-flex gap-2">
             <button class="btn btn-outline-secondary btn-sm" onclick="clearQueue()">
               <i class="fas fa-times me-1"></i>Vaciar cola
@@ -332,7 +336,21 @@
             </button>
           </div>
         </div>
+        <!-- Barra de progreso global (oculta hasta que se ejecuta) -->
+        <div id="queueProgressWrap" style="display:none" class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1" style="font-size:.82rem">
+            <span id="queueProgressLabel" class="text-secondary">Preparando…</span>
+            <span id="queueProgressFrac" class="fw-bold" style="color:#6b46c1">0 / 0</span>
+          </div>
+          <div class="progress" style="height:10px;border-radius:6px">
+            <div id="queueProgressBar" class="progress-bar" role="progressbar"
+                 style="width:0%;background:#6b46c1;transition:width .4s ease" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+        </div>
         <div id="queueList"></div>
+        <p class="text-muted small mt-2 mb-0" style="font-size:.76rem">
+          <i class="fas fa-arrows-alt me-1"></i>Arrastra las filas para reordenar
+        </p>
       </div>
     </div>
 
@@ -1240,6 +1258,8 @@ function clearQueue() {
     renderQueue();
 }
 
+let _dragSrcIdx = null;
+
 function renderQueue() {
     const panel = document.getElementById('queuePanel');
     const list  = document.getElementById('queueList');
@@ -1248,7 +1268,13 @@ function renderQueue() {
     if (!analysisQueue.length) { panel.style.display = 'none'; return; }
     panel.style.display = '';
     list.innerHTML = analysisQueue.map((item, i) =>
-        '<div class="queue-item" id="qitem-' + i + '">'
+        '<div class="queue-item" id="qitem-' + i + '" draggable="true"'
+      +   ' ondragstart="onQDragStart(event,' + i + ')"'
+      +   ' ondragover="onQDragOver(event,' + i + ')"'
+      +   ' ondragleave="onQDragLeave(event,' + i + ')"'
+      +   ' ondrop="onQDrop(event,' + i + ')"'
+      +   ' ondragend="onQDragEnd()">'
+      + '<span class="queue-drag-handle me-1"><i class="fas fa-grip-vertical"></i></span>'
       + '<span class="queue-item-name"><i class="fas fa-paw me-1 text-secondary"></i>'
       +   escHtml(item.species || '(sin nombre)') + '</span>'
       + '<span class="queue-item-meta">'
@@ -1262,32 +1288,85 @@ function renderQueue() {
     ).join('');
 }
 
+function onQDragStart(e, i) {
+    _dragSrcIdx = i;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => { const el = document.getElementById('qitem-' + i); if (el) el.classList.add('dragging'); }, 0);
+}
+function onQDragOver(e, i) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (i !== _dragSrcIdx) {
+        const el = document.getElementById('qitem-' + i);
+        if (el) el.classList.add('drag-over');
+    }
+}
+function onQDragLeave(e, i) {
+    const el = document.getElementById('qitem-' + i);
+    if (el) el.classList.remove('drag-over');
+}
+function onQDrop(e, targetIdx) {
+    e.preventDefault();
+    if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) return;
+    const moved = analysisQueue.splice(_dragSrcIdx, 1)[0];
+    analysisQueue.splice(targetIdx, 0, moved);
+    _dragSrcIdx = null;
+    renderQueue();
+}
+function onQDragEnd() {
+    _dragSrcIdx = null;
+    document.querySelectorAll('.queue-item').forEach(el => {
+        el.classList.remove('dragging', 'drag-over');
+    });
+}
+
+function setQueueProgress(done, total, label) {
+    const wrap  = document.getElementById('queueProgressWrap');
+    const bar   = document.getElementById('queueProgressBar');
+    const frac  = document.getElementById('queueProgressFrac');
+    const lbl   = document.getElementById('queueProgressLabel');
+    wrap.style.display = '';
+    const pct = total ? Math.round(done / total * 100) : 0;
+    bar.style.width    = pct + '%';
+    bar.setAttribute('aria-valuenow', pct);
+    frac.textContent   = done + ' / ' + total + ' completada' + (done !== 1 ? 's' : '');
+    lbl.textContent    = label || '';
+    // Turn bar green when all done
+    bar.style.background = done === total && total > 0 ? '#38a169' : '#6b46c1';
+}
+
 async function runQueue() {
     if (!analysisQueue.length) return;
+    const total  = analysisQueue.length;
     const runBtn = document.getElementById('runQueueBtn');
     runBtn.disabled = true;
     runBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Ejecutando…';
     document.getElementById('queuePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setQueueProgress(0, total, 'Preparando cola…');
 
+    let completed = 0;
     for (let i = 0; i < analysisQueue.length; i++) {
         const item = analysisQueue[i];
         const statusEl = document.getElementById('qstatus-' + i);
         const itemEl   = document.getElementById('qitem-'   + i);
         if (statusEl) statusEl.innerHTML = '<span class="text-primary"><i class="fas fa-circle-notch fa-spin me-1"></i>Ejecutando…</span>';
-        if (itemEl)   itemEl.classList.add('running');
+        if (itemEl)   { itemEl.classList.add('running'); itemEl.draggable = false; }
 
-        // Set taxonomy context for result badges
+        setQueueProgress(completed, total, 'Analizando: ' + (item.species || 'especie ' + (i+1)));
         window.currentTaxonomy = item.taxonomy;
 
         try {
             await runSingleItem(item);
+            completed++;
             if (statusEl) statusEl.innerHTML = '<span class="text-success"><i class="fas fa-check me-1"></i>Completado</span>';
             if (itemEl)   { itemEl.classList.remove('running'); itemEl.classList.add('done'); }
         } catch(err) {
+            completed++;  // count as processed even on error
             if (statusEl) statusEl.innerHTML = '<span class="text-danger"><i class="fas fa-times me-1"></i>Error</span>';
             if (itemEl)   { itemEl.classList.remove('running'); itemEl.classList.add('error'); }
             appendLog('error', 'Error en "' + item.species + '": ' + err.message);
         }
+        setQueueProgress(completed, total, completed === total ? '¡Cola completada!' : 'Analizando: ' + (analysisQueue[i+1]?.species || '…'));
     }
 
     runBtn.disabled = false;
