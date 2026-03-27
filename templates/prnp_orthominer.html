@@ -27,6 +27,9 @@
         .file-item .file-name { flex:1; color:#2d3748; font-family:'Courier New',monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .file-item .file-size { color:#718096; flex-shrink:0; }
         .file-item .file-remove { color:#e53e3e; cursor:pointer; flex-shrink:0; border:none; background:none; padding:0 2px; }
+        /* ── Ref mode toggle ── */
+        .btn-purple-active { background:#6b46c1; color:#fff; border-color:#6b46c1; }
+        .btn-purple-active:hover { background:#553c9a; border-color:#553c9a; color:#fff; }
         /* ── Taxonomy panel ── */
         #taxoPanel { border-color:#d6bcfa !important; background:#faf5ff !important; }
         #taxoPanel strong { color:#44337a; }
@@ -256,23 +259,52 @@
 
           <!-- Secuencia de referencia -->
           <div class="mb-3">
-            <label class="form-label" for="refPrP">
+            <label class="form-label">
               Secuencia PrP de referencia
               <span class="tooltip-icon" data-bs-toggle="tooltip"
-                title="Secuencia de nucleotídos de PrP usada como query en BLAST.">
+                title="Elige una secuencia predefinida o pega tu propia secuencia nucleotídica.">
                 <i class="fas fa-question-circle"></i></span>
             </label>
-            <select id="refPrP"></select>
-            <!-- Sequence preview -->
-            <div class="seq-preview-box" id="seqPreviewBox">
-              <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
-              <div class="seq-preview-bases" id="seqPreviewBases">—</div>
-              <div class="seq-meta" id="seqMeta"></div>
+            <!-- Toggle predefinida / personalizada -->
+            <div class="d-flex gap-2 mb-2">
+              <button type="button" id="refModePreset" class="btn btn-sm btn-purple-active"
+                      onclick="setRefMode('preset')">
+                <i class="fas fa-list me-1"></i>Predefinida
+              </button>
+              <button type="button" id="refModeCustom" class="btn btn-sm btn-outline-secondary"
+                      onclick="setRefMode('custom')">
+                <i class="fas fa-paste me-1"></i>Pegar secuencia
+              </button>
             </div>
-            <div class="help-text mt-2">
-              <i class="fas fa-lightbulb text-warning me-1"></i>
-              Usa el buscador del desplegable para filtrar por nombre de especie.
-              Ahora disponible con 38 secuencias de referencia de PrP de mamíferos.
+
+            <!-- Modo predefinida -->
+            <div id="refPresetBlock">
+              <select id="refPrP"></select>
+              <div class="seq-preview-box" id="seqPreviewBox">
+                <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
+                <div class="seq-preview-bases" id="seqPreviewBases">—</div>
+                <div class="seq-meta" id="seqMeta"></div>
+              </div>
+              <div class="help-text mt-2">
+                <i class="fas fa-lightbulb text-warning me-1"></i>
+                Usa el buscador del desplegable para filtrar por nombre de especie.
+                Ahora disponible con 38 secuencias de referencia de PrP de mamíferos.
+              </div>
+            </div>
+
+            <!-- Modo personalizada -->
+            <div id="refCustomBlock" style="display:none">
+              <input type="text" class="form-control form-control-sm mb-2" id="refCustomName"
+                     placeholder="Nombre de la secuencia (ej: PrP Myotis myotis secuenciada)"
+                     oninput="updateCustomPreview()">
+              <textarea class="form-control font-monospace" id="refCustomSeq" rows="5"
+                        placeholder="Pega aquí la secuencia nucleotídica (FASTA o sólo bases A/T/G/C)…"
+                        oninput="updateCustomPreview()" style="font-size:.78rem;resize:vertical"></textarea>
+              <div class="seq-preview-box mt-2" id="seqCustomPreviewBox" style="display:none">
+                <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
+                <div class="seq-preview-bases" id="seqCustomPreviewBases">—</div>
+                <div class="seq-meta" id="seqCustomMeta"></div>
+              </div>
             </div>
           </div>
 
@@ -700,6 +732,36 @@ function onDrop(e) {
     handleFiles(e.dataTransfer.files);
 }
 
+// ── Modo de referencia (predefinida / personalizada) ──
+let _refMode = 'preset';  // 'preset' | 'custom'
+
+function setRefMode(mode) {
+    _refMode = mode;
+    document.getElementById('refPresetBlock').style.display = mode === 'preset' ? '' : 'none';
+    document.getElementById('refCustomBlock').style.display = mode === 'custom' ? '' : 'none';
+    document.getElementById('refModePreset').className = mode === 'preset'
+        ? 'btn btn-sm btn-purple-active' : 'btn btn-sm btn-outline-secondary';
+    document.getElementById('refModeCustom').className = mode === 'custom'
+        ? 'btn btn-sm btn-purple-active' : 'btn btn-sm btn-outline-secondary';
+}
+
+function updateCustomPreview() {
+    const raw  = document.getElementById('refCustomSeq').value;
+    const seq  = raw.replace(/^>.*$/mg, '').replace(/\s/g, '').toUpperCase();
+    const box  = document.getElementById('seqCustomPreviewBox');
+    if (!seq) { box.style.display = 'none'; return; }
+    box.style.display = '';
+    document.getElementById('seqCustomPreviewBases').textContent = seq.slice(0, 100) + (seq.length > 100 ? '…' : '');
+    document.getElementById('seqCustomMeta').textContent = seq.length + ' bases';
+}
+
+function getCustomRef() {
+    const raw  = document.getElementById('refCustomSeq').value;
+    const seq  = raw.replace(/^>.*$/mg, '').replace(/\s/g, '').toUpperCase();
+    const name = document.getElementById('refCustomName').value.trim() || 'Secuencia personalizada';
+    return { refName: name, refSequence: seq };
+}
+
 // ── Validación ──
 function showValidationError(msg) {
     document.getElementById('validationMsg').textContent = msg;
@@ -708,11 +770,17 @@ function showValidationError(msg) {
 
 function validate() {
     const species = document.getElementById('nombreEspecie').value.trim();
-    const ref     = window.tomSelect ? window.tomSelect.getValue()
-                                     : document.getElementById('refPrP').value;
     if (!selectedFiles.length) { showValidationError('Selecciona al menos un archivo .gz de genoma.'); return false; }
     if (!species) { showValidationError('El nombre de la especie es obligatorio.'); return false; }
-    if (!ref)     { showValidationError('Selecciona una secuencia PrP de referencia.'); return false; }
+    if (_refMode === 'preset') {
+        const ref = window.tomSelect ? window.tomSelect.getValue()
+                                     : document.getElementById('refPrP').value;
+        if (!ref) { showValidationError('Selecciona una secuencia PrP de referencia.'); return false; }
+    } else {
+        const seq = document.getElementById('refCustomSeq').value.replace(/^>.*$/mg,'').replace(/\s/g,'');
+        if (!seq) { showValidationError('Pega una secuencia nucleotídica de referencia.'); return false; }
+        if (seq.length < 50) { showValidationError('La secuencia personalizada parece demasiado corta (mín. 50 bases).'); return false; }
+    }
     document.getElementById('validationAlert').classList.add('d-none');
     return true;
 }
@@ -1246,11 +1314,17 @@ async function deleteKeptFiles() {
 let analysisQueue = [];  // [{ species, files, refName, refSequence, taxonomy }]
 
 function getFormItem() {
-    const refName     = window.tomSelect ? window.tomSelect.getValue()
-                                         : document.getElementById('refPrP').value;
-    const seqData     = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
-    const refSequence = seqData ? seqData.sequence.replace(/\s/g, '') : '';
-    const species     = document.getElementById('nombreEspecie').value.trim();
+    const species = document.getElementById('nombreEspecie').value.trim();
+    let refName, refSequence;
+    if (_refMode === 'custom') {
+        const custom = getCustomRef();
+        refName = custom.refName; refSequence = custom.refSequence;
+    } else {
+        refName = window.tomSelect ? window.tomSelect.getValue()
+                                   : document.getElementById('refPrP').value;
+        const seqData = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
+        refSequence   = seqData ? seqData.sequence.replace(/\s/g, '') : '';
+    }
     return { species, files: [...selectedFiles], refName, refSequence,
              taxonomy: window.currentTaxonomy ? { ...window.currentTaxonomy } : null };
 }
