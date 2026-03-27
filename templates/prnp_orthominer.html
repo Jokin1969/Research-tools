@@ -281,9 +281,44 @@
             <div id="refPresetBlock">
               <select id="refPrP"></select>
               <div class="seq-preview-box" id="seqPreviewBox">
-                <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
-                <div class="seq-preview-bases" id="seqPreviewBases">—</div>
-                <div class="seq-meta" id="seqMeta"></div>
+                <!-- Vista normal -->
+                <div id="seqPreviewView">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:2px 8px;" onclick="openSeqEditor()">
+                      <i class="fas fa-edit me-1"></i>Editar
+                    </button>
+                  </div>
+                  <div class="seq-preview-bases" id="seqPreviewBases">—</div>
+                  <div class="seq-meta" id="seqMeta"></div>
+                </div>
+                <!-- Editor de secuencia -->
+                <div id="seqEditorView" style="display:none">
+                  <div class="seq-preview-label mb-2"><i class="fas fa-edit me-1"></i>Editor de secuencia</div>
+                  <div class="d-flex gap-2 mb-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="trimNterm()" title="Eliminar primeras 100 bases (extremo N-terminal)">
+                      <i class="fas fa-cut me-1"></i>−100 N-term
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="trimCterm()" title="Eliminar últimas 100 bases (extremo C-terminal)">
+                      <i class="fas fa-cut me-1"></i>−100 C-term
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" onclick="restoreOriginalSeq()">
+                      <i class="fas fa-undo me-1"></i>Restaurar original
+                    </button>
+                  </div>
+                  <textarea id="seqEditorTextarea" class="form-control font-monospace" rows="6"
+                            style="font-size:.76rem;resize:vertical;white-space:pre-wrap;word-break:break-all"
+                            oninput="onSeqEditorInput()"></textarea>
+                  <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="seq-meta" id="seqEditorMeta"></span>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeSeqEditor(false)">Cancelar</button>
+                      <button type="button" class="btn btn-sm btn-purple-active" onclick="closeSeqEditor(true)">
+                        <i class="fas fa-check me-1"></i>Aplicar
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div class="help-text mt-2">
                 <i class="fas fa-lightbulb text-warning me-1"></i>
@@ -304,6 +339,41 @@
                 <div class="seq-preview-label"><i class="fas fa-dna me-1"></i>Preview (primeras 100 bases)</div>
                 <div class="seq-preview-bases" id="seqCustomPreviewBases">—</div>
                 <div class="seq-meta" id="seqCustomMeta"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Parámetros BLAST avanzados -->
+          <div class="mb-3">
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100 text-start" onclick="toggleBlastParams()"
+                    id="blastParamsToggle" style="font-size:.82rem;">
+              <i class="fas fa-sliders-h me-2"></i>Parámetros BLAST avanzados
+              <i class="fas fa-chevron-down ms-2 float-end" id="blastParamsChevron" style="margin-top:2px;transition:transform .2s"></i>
+            </button>
+            <div id="blastParamsPanel" style="display:none;background:#faf5ff;border:1px solid #d6bcfa;border-radius:0 0 10px 10px;padding:14px 16px;border-top:none;">
+              <div class="row g-3">
+                <div class="col-sm-6">
+                  <label class="form-label" style="font-size:.82rem;font-weight:600;color:#4a5568;" for="blastEvalue">
+                    E-value
+                    <span class="tooltip-icon" data-bs-toggle="tooltip"
+                      title="Umbral de E-value para BLASTN. Por defecto: 10 (valor estándar de BLAST). Valores menores son más estrictos (ej: 1e-5).">
+                      <i class="fas fa-question-circle"></i></span>
+                  </label>
+                  <input type="text" class="form-control form-control-sm font-monospace" id="blastEvalue"
+                         placeholder="Por defecto: 10" style="font-size:.82rem;">
+                  <div class="help-text mt-1">Menor = más estricto (ej: <code>1e-5</code>)</div>
+                </div>
+                <div class="col-sm-6">
+                  <label class="form-label" style="font-size:.82rem;font-weight:600;color:#4a5568;" for="blastPercIdentity">
+                    % Identidad mínima
+                    <span class="tooltip-icon" data-bs-toggle="tooltip"
+                      title="Filtro de porcentaje de identidad de secuencia. Por defecto: sin filtro. Valor entre 0 y 100.">
+                      <i class="fas fa-question-circle"></i></span>
+                  </label>
+                  <input type="number" class="form-control form-control-sm" id="blastPercIdentity"
+                         placeholder="Sin filtro" min="0" max="100" step="0.1" style="font-size:.82rem;">
+                  <div class="help-text mt-1">0–100, sin valor = sin filtro</div>
+                </div>
               </div>
             </div>
           </div>
@@ -762,6 +832,91 @@ function getCustomRef() {
     return { refName: name, refSequence: seq };
 }
 
+// ── Editor de secuencia de referencia predefinida ──
+let _editedRefSeq = null;   // null = usar secuencia original; string = secuencia editada
+let _originalRefSeq = '';   // copia de la secuencia original para restaurar
+
+function openSeqEditor() {
+    if (!window.tomSelect || !window.PRP_SEQUENCES) return;
+    const name = window.tomSelect.getValue();
+    const data = window.PRP_SEQUENCES[name];
+    if (!data) return;
+    _originalRefSeq = data.sequence.replace(/\s/g, '');
+    const current = _editedRefSeq !== null ? _editedRefSeq : _originalRefSeq;
+    document.getElementById('seqEditorTextarea').value = current;
+    _updateEditorMeta(current.length);
+    document.getElementById('seqPreviewView').style.display = 'none';
+    document.getElementById('seqEditorView').style.display = '';
+}
+
+function closeSeqEditor(apply) {
+    if (apply) {
+        const newSeq = document.getElementById('seqEditorTextarea').value.replace(/\s/g, '').toUpperCase();
+        if (newSeq.length < 10) { alert('La secuencia editada es demasiado corta.'); return; }
+        _editedRefSeq = newSeq;
+        // Actualizar preview con la secuencia editada
+        document.getElementById('seqPreviewBases').textContent = newSeq.slice(0, 100) + (newSeq.length > 100 ? '…' : '');
+        const origLen = _originalRefSeq.length;
+        const diff = origLen - newSeq.length;
+        const diffStr = diff > 0 ? ` (−${diff} bases respecto al original)` : '';
+        document.getElementById('seqMeta').textContent =
+            'Longitud: ' + newSeq.length + ' bp' + diffStr + ' ✎ editada';
+    }
+    document.getElementById('seqEditorView').style.display = 'none';
+    document.getElementById('seqPreviewView').style.display = '';
+}
+
+function trimNterm() {
+    const ta = document.getElementById('seqEditorTextarea');
+    const seq = ta.value.replace(/\s/g, '');
+    if (seq.length <= 100) { alert('La secuencia es ya de 100 bases o menos; no se puede recortar más.'); return; }
+    ta.value = seq.slice(100);
+    _updateEditorMeta(ta.value.length);
+}
+
+function trimCterm() {
+    const ta = document.getElementById('seqEditorTextarea');
+    const seq = ta.value.replace(/\s/g, '');
+    if (seq.length <= 100) { alert('La secuencia es ya de 100 bases o menos; no se puede recortar más.'); return; }
+    ta.value = seq.slice(0, -100);
+    _updateEditorMeta(ta.value.length);
+}
+
+function restoreOriginalSeq() {
+    document.getElementById('seqEditorTextarea').value = _originalRefSeq;
+    _editedRefSeq = null;
+    _updateEditorMeta(_originalRefSeq.length);
+}
+
+function onSeqEditorInput() {
+    const len = document.getElementById('seqEditorTextarea').value.replace(/\s/g, '').length;
+    _updateEditorMeta(len);
+}
+
+function _updateEditorMeta(len) {
+    const orig = _originalRefSeq.length;
+    const diff = orig - len;
+    const diffStr = diff > 0 ? `  |  −${diff} vs original` : (diff < 0 ? `  |  +${Math.abs(diff)} vs original` : '');
+    document.getElementById('seqEditorMeta').textContent = `${len} bp${diffStr}`;
+}
+
+// ── Parámetros BLAST avanzados ──
+let _blastParamsOpen = false;
+function toggleBlastParams() {
+    _blastParamsOpen = !_blastParamsOpen;
+    document.getElementById('blastParamsPanel').style.display = _blastParamsOpen ? '' : 'none';
+    document.getElementById('blastParamsChevron').style.transform = _blastParamsOpen ? 'rotate(180deg)' : '';
+    document.getElementById('blastParamsToggle').style.borderRadius = _blastParamsOpen
+        ? '6px 6px 0 0' : '';
+}
+
+function getBlastParams() {
+    return {
+        evalue: document.getElementById('blastEvalue').value.trim(),
+        percIdentity: document.getElementById('blastPercIdentity').value.trim()
+    };
+}
+
 // ── Validación ──
 function showValidationError(msg) {
     document.getElementById('validationMsg').textContent = msg;
@@ -803,6 +958,7 @@ function escHtml(str) {
 }
 
 function appendLog(type, message) {
+    if (message === undefined || message === null) return;  // defensive: ignore ping/empty events
     const box  = document.getElementById('logBox');
     const line = document.createElement('div');
     line.className = 'log-line log-' + type;
@@ -1323,10 +1479,13 @@ function getFormItem() {
         refName = window.tomSelect ? window.tomSelect.getValue()
                                    : document.getElementById('refPrP').value;
         const seqData = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
-        refSequence   = seqData ? seqData.sequence.replace(/\s/g, '') : '';
+        const origSeq = seqData ? seqData.sequence.replace(/\s/g, '') : '';
+        refSequence = _editedRefSeq !== null ? _editedRefSeq : origSeq;
     }
+    const blast = getBlastParams();
     return { species, files: [...selectedFiles], refName, refSequence,
-             taxonomy: window.currentTaxonomy ? { ...window.currentTaxonomy } : null };
+             taxonomy: window.currentTaxonomy ? { ...window.currentTaxonomy } : null,
+             blastEvalue: blast.evalue, blastPercIdentity: blast.percIdentity };
 }
 
 function addToQueue() {
@@ -1343,6 +1502,8 @@ function addToQueue() {
     selectedFiles = [];
     renderFileList();
     document.getElementById('summaryBox').classList.add('d-none');
+    _editedRefSeq = null;
+    updateSeqPreview();
 }
 
 function removeFromQueue(i) {
@@ -1490,6 +1651,8 @@ function runSingleItem(item) {
         formData.append('refName',       item.refName);
         formData.append('refSequence',   item.refSequence);
         item.files.forEach(f => formData.append('genomeFiles', f));
+        if (item.blastEvalue)       formData.append('blastEvalue',       item.blastEvalue);
+        if (item.blastPercIdentity) formData.append('blastPercIdentity', item.blastPercIdentity);
 
         try {
             appendLog('info', '[' + escHtml(item.species) + '] Subiendo ' + item.files.length + ' archivo(s)…');
@@ -1643,7 +1806,13 @@ try {
     window.tomSelect.setValue(
         tsOptions.find(o => o.value === defaultKey) ? defaultKey : firstKey
     );
-    window.tomSelect.on('change', updateSeqPreview);
+    window.tomSelect.on('change', () => {
+        _editedRefSeq = null;   // reset any edits when user picks a different reference
+        // also close editor if open
+        document.getElementById('seqEditorView').style.display = 'none';
+        document.getElementById('seqPreviewView').style.display = '';
+        updateSeqPreview();
+    });
     updateSeqPreview();
 } catch(e) {
     console.error('Error cargando secuencias o Tom-Select:', e);
@@ -1654,10 +1823,17 @@ function updateSeqPreview() {
     const name = window.tomSelect.getValue();
     const data = window.PRP_SEQUENCES[name];
     if (!data) return;
-    const seq = data.sequence.replace(/\s/g, '');
-    document.getElementById('seqPreviewBases').textContent = seq.substring(0, 100) + '\u2026';
-    document.getElementById('seqMeta').textContent =
-        'Grupo: ' + data.group + '  |  Longitud total: ' + seq.length + ' bp';
+    const origSeq = data.sequence.replace(/\s/g, '');
+    const displaySeq = _editedRefSeq !== null ? _editedRefSeq : origSeq;
+    document.getElementById('seqPreviewBases').textContent = displaySeq.substring(0, 100) + '\u2026';
+    if (_editedRefSeq !== null) {
+        const diff = origSeq.length - _editedRefSeq.length;
+        document.getElementById('seqMeta').textContent =
+            'Longitud: ' + _editedRefSeq.length + ' bp  |  −' + diff + ' bases vs original ✎ editada';
+    } else {
+        document.getElementById('seqMeta').textContent =
+            'Grupo: ' + data.group + '  |  Longitud total: ' + origSeq.length + ' bp';
+    }
 }
 </script>
 </body>

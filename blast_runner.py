@@ -111,7 +111,8 @@ def _cleanup(*paths):
 # BLAST
 # ---------------------------------------------------------------------------
 
-def _blastn(genome: str, ref: str, outfmt: str, out_path: str) -> tuple:
+def _blastn(genome: str, ref: str, outfmt: str, out_path: str,
+            evalue: str = None, perc_identity: float = None) -> tuple:
     """
     Ejecuta blastn con el formato indicado.
     Devuelve (returncode, stderr).
@@ -119,6 +120,10 @@ def _blastn(genome: str, ref: str, outfmt: str, out_path: str) -> tuple:
     """
     cmd = ['blastn', '-query', genome, '-subject', ref,
            '-outfmt', outfmt, '-out', out_path]
+    if evalue:
+        cmd += ['-evalue', str(evalue)]
+    if perc_identity is not None:
+        cmd += ['-perc_identity', str(perc_identity)]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
         return r.returncode, r.stderr
@@ -133,17 +138,18 @@ def _blastn(genome: str, ref: str, outfmt: str, out_path: str) -> tuple:
         )
 
 
-def run_blast_dual(genome: str, ref: str, txt_out: str, tab_out: str) -> tuple:
+def run_blast_dual(genome: str, ref: str, txt_out: str, tab_out: str,
+                   evalue: str = None, perc_identity: float = None) -> tuple:
     """
     Ejecuta BLAST dos veces:
       1) -outfmt 1  -> informe de texto legible (compatible con el original)
       2) -outfmt 6  -> tabla de coordenadas para extracción precisa
     Devuelve (returncode, stderr) del último paso.
     """
-    rc, err = _blastn(genome, ref, '1', txt_out)
+    rc, err = _blastn(genome, ref, '1', txt_out, evalue, perc_identity)
     if rc != 0:
         return rc, err
-    rc, err = _blastn(genome, ref, '6', tab_out)
+    rc, err = _blastn(genome, ref, '6', tab_out, evalue, perc_identity)
     return rc, err
 
 
@@ -361,7 +367,8 @@ def extract_extended_fasta(genome_path: str, hit: dict, out_fasta: str, species:
 # Pipeline completo (generador de eventos de progreso)
 # ---------------------------------------------------------------------------
 
-def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path, job_id=''):
+def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path, job_id='',
+                        evalue=None, perc_identity=None):
     """
     Generador que ejecuta el pipeline paso a paso.
     Emite tuplas (event_type, message) con tipos:
@@ -373,6 +380,11 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path,
     yield 'info',  f'Ruta base      : {base_path}'
     yield 'info',  f'Ruta salida    : {output_path}'
     yield 'info',  f'Extensión flanq.: ±{FLANK_BP} bp'
+    if evalue or perc_identity is not None:
+        params_str = []
+        if evalue: params_str.append(f'e-value={evalue}')
+        if perc_identity is not None: params_str.append(f'identidad≥{perc_identity}%')
+        yield 'info', f'Parámetros BLAST: {", ".join(params_str)}'
 
     species_path = os.path.join(base_path.rstrip('/\\'), species)
 
@@ -432,7 +444,8 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path,
         # 2. BLAST (x2) -----------------------------------------------------
         try:
             yield 'step', 'Ejecutando BLAST (informe de texto + tabla de coordenadas)…'
-            rc, stderr = run_blast_dual(genome_path, ref_fasta, txt_blast, tab_blast)
+            rc, stderr = run_blast_dual(genome_path, ref_fasta, txt_blast, tab_blast,
+                                        evalue=evalue, perc_identity=perc_identity)
             if rc != 0:
                 yield 'error', f'BLAST falló ({filename}): {stderr[:300]}'
                 errors += 1
@@ -510,7 +523,7 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path,
 # ---------------------------------------------------------------------------
 
 def start_job(base_path, species, ref_name, ref_sequence, output_path,
-              cleanup_dir=None) -> str:
+              cleanup_dir=None, evalue=None, perc_identity=None) -> str:
     """Lanza el pipeline en un hilo background y devuelve el job_id.
 
     Si se pasa cleanup_dir, ese directorio se borra automáticamente
@@ -524,7 +537,8 @@ def start_job(base_path, species, ref_name, ref_sequence, output_path,
         hit_found = False
         try:
             for etype, msg in _pipeline_generator(
-                base_path, species, ref_name, ref_sequence, output_path, job_id
+                base_path, species, ref_name, ref_sequence, output_path, job_id,
+                evalue=evalue, perc_identity=perc_identity
             ):
                 q.put({'type': etype, 'message': msg})
                 if etype == 'result':

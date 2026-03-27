@@ -164,6 +164,12 @@ def prnp_start():
         if not gz_files:
             return jsonify({'error': 'No se encontraron archivos .gz entre los subidos.'}), 400
 
+        # Parámetros BLAST opcionales
+        evalue_raw   = request.form.get('blastEvalue', '').strip()
+        percid_raw   = request.form.get('blastPercIdentity', '').strip()
+        evalue       = evalue_raw if evalue_raw else None
+        perc_identity = float(percid_raw) if percid_raw else None
+
         work_dir    = tempfile.mkdtemp(prefix='prnp_')
         species_dir = os.path.join(work_dir, species)
         os.makedirs(species_dir, exist_ok=True)
@@ -173,7 +179,8 @@ def prnp_start():
             f.save(os.path.join(species_dir, filename))
 
         job_id = start_job(work_dir, species, ref_name, ref_sequence,
-                           work_dir, cleanup_dir=work_dir)
+                           work_dir, cleanup_dir=work_dir,
+                           evalue=evalue, perc_identity=perc_identity)
         return jsonify({'job_id': job_id})
 
     # ── Modo ruta local (JSON) — para uso local ──
