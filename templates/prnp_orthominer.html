@@ -958,6 +958,7 @@ function escHtml(str) {
 }
 
 function appendLog(type, message) {
+    if (message === undefined || message === null) return;  // defensive: ignore ping/empty events
     const box  = document.getElementById('logBox');
     const line = document.createElement('div');
     line.className = 'log-line log-' + type;
