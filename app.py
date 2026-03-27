@@ -11,7 +11,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from flask import Flask, render_template, request, jsonify, Response
 from sequences import PRP_SEQUENCES, GROUPS_ORDER
-from blast_runner import start_job, get_job_queue, cleanup_job
+from blast_runner import (start_job, get_job_queue, cleanup_job,
+                          get_kept_files, consume_kept_files, delete_kept_files)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10 GB
@@ -218,6 +219,35 @@ def prnp_stream(job_id):
             'Connection':       'keep-alive'
         }
     )
+
+
+@app.route('/prnp-orthominer/retry/<job_id>', methods=['POST'])
+def prnp_retry(job_id):
+    """Reintenta el análisis sobre los archivos conservados, con otra referencia."""
+    data         = request.get_json(force=True) or {}
+    ref_name     = data.get('refName', '').strip()
+    ref_sequence = data.get('refSequence', '').strip()
+
+    if not all([ref_name, ref_sequence]):
+        return jsonify({'error': 'Faltan refName o refSequence.'}), 400
+
+    stored = consume_kept_files(job_id)   # quita la entrada sin borrar archivos
+    if not stored:
+        return jsonify({'error': 'Archivos no disponibles (ya borrados o job no encontrado).'}), 404
+
+    work_dir = stored['work_dir']
+    species  = stored['species']
+
+    new_job_id = start_job(work_dir, species, ref_name, ref_sequence,
+                           work_dir, cleanup_dir=work_dir)
+    return jsonify({'job_id': new_job_id, 'species': species})
+
+
+@app.route('/prnp-orthominer/delete-files/<job_id>', methods=['POST'])
+def prnp_delete_files(job_id):
+    """Borra manualmente los archivos temporales conservados tras un análisis sin hit."""
+    deleted = delete_kept_files(job_id)
+    return jsonify({'deleted': deleted})
 
 
 if __name__ == '__main__':

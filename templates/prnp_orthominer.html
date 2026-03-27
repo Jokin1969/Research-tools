@@ -51,6 +51,10 @@
         .status-error   { background:#fed7d7; color:#742a2a; }
         .pulse { animation: pulse-anim 1.2s infinite; }
         @keyframes pulse-anim { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        /* ── Retry panel ── */
+        #retryPanel { display:none; }
+        .retry-card { border:2px solid #f6ad55; border-radius:12px; padding:20px; background:#fffaf0; }
+        .retry-card h5 { color:#c05621; font-weight:700; margin-bottom:12px; }
         /* ── Results panel ── */
         #resultsPanel { display:none; }
         .result-card { border:1px solid #d6bcfa; border-radius:12px; overflow:hidden; margin-bottom:20px; }
@@ -272,6 +276,28 @@
           </button>
           <button class="btn btn-outline-secondary btn-sm ms-2" onclick="copyLog()">
             <i class="fas fa-copy me-1"></i>Copiar log
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Retry Panel (visible solo si no hay hits) -->
+    <div id="retryPanel" class="mt-4">
+      <div class="retry-card">
+        <h5><i class="fas fa-search me-2"></i>No se encontró PRNP — ¿Probar con otra secuencia de referencia?</h5>
+        <p style="font-size:0.87rem;color:#744210;" class="mb-3">
+          Los archivos del genoma siguen en el servidor. Selecciona una referencia diferente y reintenta sin necesidad de volver a subir los archivos.
+        </p>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nueva secuencia de referencia</label>
+          <div id="retrySelectContainer" style="max-width:420px;"></div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-warning" onclick="retryAnalysis()">
+            <i class="fas fa-redo me-1"></i>Reintentar con esta referencia
+          </button>
+          <button class="btn btn-outline-danger" onclick="deleteKeptFiles()">
+            <i class="fas fa-trash me-1"></i>Borrar archivos del servidor
           </button>
         </div>
       </div>
@@ -570,6 +596,81 @@ function clearResults() {
     document.getElementById('resultsPanel').style.display = 'none';
 }
 
+// ── Retry panel ──
+let currentJobId = null;
+let retrySelect  = null;
+
+function showRetryPanel(jobId) {
+    currentJobId = jobId;
+    document.getElementById('retryPanel').style.display = 'block';
+
+    // Crear un Tom-Select de reintento si no existe aún
+    const container = document.getElementById('retrySelectContainer');
+    if (!retrySelect && window.PRP_SEQUENCES) {
+        const sel = document.createElement('select');
+        sel.id = 'retryRefPrP';
+        container.appendChild(sel);
+        const opts = Object.keys(window.PRP_SEQUENCES).sort((a,b) => a.localeCompare(b,'es'));
+        retrySelect = new TomSelect('#retryRefPrP', {
+            options:   opts.map(n => ({ value: n, text: n })),
+            labelField:'text', valueField:'value', searchField:'text',
+            placeholder:'Buscar secuencia PrP\u2026', create: false
+        });
+        if (opts.length) retrySelect.setValue(opts[0]);
+    }
+    document.getElementById('retryPanel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function hideRetryPanel() {
+    document.getElementById('retryPanel').style.display = 'none';
+}
+
+async function retryAnalysis() {
+    if (!currentJobId) return;
+    const refName = retrySelect ? retrySelect.getValue()
+                                : document.getElementById('retryRefPrP').value;
+    if (!refName) { alert('Selecciona una secuencia de referencia.'); return; }
+    const seqData     = window.PRP_SEQUENCES && window.PRP_SEQUENCES[refName];
+    const refSequence = seqData ? seqData.sequence.replace(/\s/g,'') : '';
+
+    hideRetryPanel();
+    document.getElementById('logBox').innerHTML = '';
+    document.getElementById('summaryBox').classList.add('d-none');
+    setStatus('running', 'Ejecutando\u2026');
+    appendLog('info', 'Reintentando con referencia: ' + refName);
+
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Analizando\u2026';
+    if (currentES) { currentES.close(); currentES = null; }
+
+    try {
+        const res = await fetch('/prnp-orthominer/retry/' + currentJobId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refName, refSequence })
+        });
+        const { job_id, error } = await res.json();
+        if (error) { appendLog('error', error); setStatus('error','Error'); resetBtn(); return; }
+        currentJobId = job_id;
+        connectSSE(job_id);
+    } catch(err) {
+        appendLog('error', 'Error de red: ' + err);
+        setStatus('error','Error');
+        resetBtn();
+    }
+}
+
+async function deleteKeptFiles() {
+    if (!currentJobId) return;
+    try {
+        await fetch('/prnp-orthominer/delete-files/' + currentJobId, { method: 'POST' });
+    } catch(e) { /* ignorar */ }
+    hideRetryPanel();
+    appendLog('info', 'Archivos del servidor eliminados.');
+    currentJobId = null;
+}
+
 // ── Pipeline + SSE ──
 let currentES = null;
 
@@ -589,6 +690,8 @@ async function startAnalysis() {
     document.getElementById('summaryBox').classList.add('d-none');
     setStatus('running', 'Subiendo archivos\u2026');
     document.getElementById('resultsPanel').style.display = 'none';
+    document.getElementById('retryPanel').style.display = 'none';
+    resultCount = 0;
     document.getElementById('resultsContainer').innerHTML =
         '<p class="no-results-msg"><i class="fas fa-hourglass-half me-2"></i>'
         + 'Los resultados aparecer\u00e1n aqu\u00ed al terminar el an\u00e1lisis.</p>';
@@ -616,32 +719,39 @@ async function startAnalysis() {
         if (error) { appendLog('error', error); setStatus('error', 'Error'); resetBtn(); return; }
         setStatus('running', 'Ejecutando\u2026');
         btn.innerHTML = '<i class="fas fa-circle-notch fa-spin me-2"></i>Analizando\u2026';
-
-        currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
-        currentES.onmessage = (e) => {
-            const msg = JSON.parse(e.data);
-            if (msg.type === 'closed') { currentES.close(); resetBtn(); return; }
-            if (msg.type === 'result') { appendResult(msg.message); return; }
-            appendLog(msg.type, msg.message);
-            if (msg.type === 'done') {
-                setStatus('done', 'Completado');
-                document.getElementById('summaryText').textContent = msg.message;
-                document.getElementById('summaryBox').classList.remove('d-none');
-                currentES.close(); resetBtn();
-            } else if (msg.type === 'error') {
-                setStatus('error', 'Error');
-            }
-        };
-        currentES.onerror = () => {
-            appendLog('error', 'Conexi\u00f3n SSE interrumpida.');
-            setStatus('error', 'Error de conexi\u00f3n');
-            resetBtn();
-        };
+        currentJobId = job_id;
+        connectSSE(job_id);
     } catch(err) {
         appendLog('error', 'Error de red: ' + err);
         setStatus('error', 'Error');
         resetBtn();
     }
+}
+
+function connectSSE(job_id) {
+    if (currentES) { currentES.close(); currentES = null; }
+    currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
+    currentES.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'closed') { currentES.close(); resetBtn(); return; }
+        if (msg.type === 'result') { appendResult(msg.message); return; }
+        appendLog(msg.type, msg.message);
+        if (msg.type === 'done') {
+            setStatus('done', 'Completado');
+            document.getElementById('summaryText').textContent = msg.message;
+            document.getElementById('summaryBox').classList.remove('d-none');
+            currentES.close(); resetBtn();
+            // Si no se encontró ningún hit, ofrecer reintento
+            if (resultCount === 0) showRetryPanel(job_id);
+        } else if (msg.type === 'error') {
+            setStatus('error', 'Error');
+        }
+    };
+    currentES.onerror = () => {
+        appendLog('error', 'Conexi\u00f3n SSE interrumpida.');
+        setStatus('error', 'Error de conexi\u00f3n');
+        resetBtn();
+    };
 }
 
 // Bootstrap tooltips

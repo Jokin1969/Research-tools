@@ -34,6 +34,27 @@ FLANK_BP = 200          # Nucleotídos de extensión en cada extremo
 # ---------------------------------------------------------------------------
 _jobs: dict = {}
 
+# Archivos temporales conservados cuando no hay hit (para reintento)
+# {job_id: {'work_dir': str, 'species': str}}
+_kept_files: dict = {}
+
+
+def get_kept_files(job_id: str):
+    return _kept_files.get(job_id)
+
+
+def consume_kept_files(job_id: str):
+    """Quita y devuelve la entrada sin borrar los archivos (para reintento)."""
+    return _kept_files.pop(job_id, None)
+
+
+def delete_kept_files(job_id: str) -> bool:
+    entry = _kept_files.pop(job_id, None)
+    if entry and os.path.isdir(entry['work_dir']):
+        shutil.rmtree(entry['work_dir'], ignore_errors=True)
+        return True
+    return False
+
 
 # ---------------------------------------------------------------------------
 # Utilidades de ficheros
@@ -441,16 +462,15 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
                         f'identidad={hit["pident"]:.1f}% | '
                         f'e-value={hit["evalue"]}'
                     )
-                    yield 'success', (
-                        f'  → {base_name}_output.txt   '
-                        f'  → {base_name}_outputFA.fasta'
-                    )
                     yield 'result', {
                         'species':       species,
                         'genome_file':   base_name,
                         'fasta_content': result['fasta_content'],
                         'genomic_info':  result['genomic_info']
                     }
+                    _cleanup(genome_path, txt_blast, tab_blast)
+                    yield 'info', 'Análisis detenido: locus encontrado. Archivos temporales eliminados.'
+                    break   # parar al primer hit
                 else:
                     yield 'warning', 'No se pudo extraer la secuencia del contig del genoma.'
                     no_hit += 1
@@ -486,17 +506,29 @@ def start_job(base_path, species, ref_name, ref_sequence, output_path,
     _jobs[job_id] = q
 
     def worker():
+        hit_found = False
         try:
             for etype, msg in _pipeline_generator(
                 base_path, species, ref_name, ref_sequence, output_path
             ):
                 q.put({'type': etype, 'message': msg})
+                if etype == 'result':
+                    hit_found = True
         except Exception as e:
             q.put({'type': 'error', 'message': str(e)})
         finally:
             q.put(None)   # sentinel — fin del stream
-            if cleanup_dir and os.path.isdir(cleanup_dir):
-                shutil.rmtree(cleanup_dir, ignore_errors=True)
+            if cleanup_dir:
+                if hit_found:
+                    # Hit encontrado: los archivos ya se borraron en el generator
+                    # (solo queda el directorio vacío)
+                    shutil.rmtree(cleanup_dir, ignore_errors=True)
+                else:
+                    # Sin hit: conservar archivos para posible reintento
+                    _kept_files[job_id] = {
+                        'work_dir': cleanup_dir,
+                        'species':  species
+                    }
 
     threading.Thread(target=worker, daemon=True).start()
     return job_id
