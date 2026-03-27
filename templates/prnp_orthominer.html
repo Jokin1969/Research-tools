@@ -1427,7 +1427,12 @@ function runSingleItem(item) {
             showCancelBtn();
 
             currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
+            let _sseReconnectTimer = null;
+
+            function _clearSseTimer() { clearTimeout(_sseReconnectTimer); _sseReconnectTimer = null; }
+
             currentES.onmessage = (e) => {
+                _clearSseTimer();  // got a message → connection alive, cancel any pending timeout
                 const msg = JSON.parse(e.data);
                 if (msg.type === 'closed') { currentES.close(); resetBtn(); resolve(); return; }
                 if (msg.type === 'result') { appendResult(msg.message); return; }
@@ -1444,10 +1449,15 @@ function runSingleItem(item) {
                 }
             };
             currentES.onerror = () => {
-                appendLog('error', 'Conexión SSE interrumpida.');
-                setStatus('error', 'Error de conexión');
-                resetBtn();
-                reject(new Error('Conexión SSE interrumpida'));
+                if (_sseReconnectTimer) return;  // already waiting
+                appendLog('warning', 'Conexi\u00f3n SSE interrumpida. Reconectando\u2026');
+                setStatus('running', 'Reconectando\u2026');
+                _sseReconnectTimer = setTimeout(() => {
+                    appendLog('error', 'No se pudo reconectar tras 90 segundos. An\u00e1lisis interrumpido.');
+                    setStatus('error', 'Error de conexi\u00f3n');
+                    currentES.close(); resetBtn();
+                    reject(new Error('Conexi\u00f3n SSE perdida'));
+                }, 90000);
             };
         } catch(err) {
             appendLog('error', 'Error de red: ' + err);
@@ -1478,7 +1488,10 @@ function connectSSE(job_id) {
     // Legacy wrapper used by retry panel
     if (currentES) { currentES.close(); currentES = null; }
     currentES = new EventSource('/prnp-orthominer/stream/' + job_id);
+    let _sseReconnectTimer = null;
+
     currentES.onmessage = (e) => {
+        clearTimeout(_sseReconnectTimer); _sseReconnectTimer = null;
         const msg = JSON.parse(e.data);
         if (msg.type === 'closed') { currentES.close(); resetBtn(); return; }
         if (msg.type === 'result') { appendResult(msg.message); return; }
@@ -1495,9 +1508,14 @@ function connectSSE(job_id) {
         }
     };
     currentES.onerror = () => {
-        appendLog('error', 'Conexión SSE interrumpida.');
-        setStatus('error', 'Error de conexión');
-        resetBtn();
+        if (_sseReconnectTimer) return;
+        appendLog('warning', 'Conexi\u00f3n SSE interrumpida. Reconectando\u2026');
+        setStatus('running', 'Reconectando\u2026');
+        _sseReconnectTimer = setTimeout(() => {
+            appendLog('error', 'No se pudo reconectar tras 90 segundos.');
+            setStatus('error', 'Error de conexi\u00f3n');
+            currentES.close(); resetBtn();
+        }, 90000);
     };
 }
 
