@@ -109,13 +109,13 @@
               <div class="input-group">
                 <button class="btn btn-outline-secondary" type="button"
                         onclick="fillExamplePath()"
-                        data-bs-toggle="tooltip" title="Usar ruta de ejemplo: F:\WGS\">
+                        title="Usar ruta de ejemplo: F:\WGS\">
                   <i class="fas fa-folder-open"></i>
                 </button>
                 <input type="text" class="form-control" id="rutaBase"
                        placeholder="Ej: F:\WGS\" oninput="updatePaths()">
               </div>
-              <div class="help-text">Haz clic en <i class="fas fa-folder-open"></i> para usar la ruta de ejemplo.</div>
+              <div class="help-text">Haz clic en <i class="fas fa-folder-open"></i> para usar <code>F:\WGS\</code> como ruta de ejemplo.</div>
             </div>
             <div class="col-md-6">
               <label class="form-label" for="nombreEspecie">
@@ -174,16 +174,20 @@
                 <i class="fas fa-question-circle"></i></span>
             </label>
             <div class="input-group">
-              <span class="input-group-text"><i class="fas fa-folder-plus"></i></span>
+              <button class="btn btn-outline-secondary" type="button"
+                      onclick="resetSalida()"
+                      title="Copiar ruta base como carpeta de salida">
+                <i class="fas fa-folder-plus"></i>
+              </button>
               <input type="text" class="form-control" id="rutaSalida"
                      placeholder="Se rellena automáticamente con la ruta base"
                      oninput="markSalidaManual()">
               <button class="btn btn-outline-secondary" type="button"
-                      onclick="resetSalida()" data-bs-toggle="tooltip" title="Restaurar al valor por defecto">
+                      onclick="resetSalida()" title="Restaurar al valor por defecto">
                 <i class="fas fa-undo"></i>
               </button>
             </div>
-            <div class="help-text">Editable si deseas una carpeta de resultados diferente.</div>
+            <div class="help-text">Se rellena automáticamente con la ruta base. Edítalo para usar una carpeta diferente.</div>
           </div>
 
           <!-- Validation error -->
@@ -304,28 +308,39 @@ for (const name of sortedNames) {
     tsOptions.push({ value: name, text: name, optgroup: grp });
 }
 
-const tomSelect = new TomSelect('#refPrP', {
-    options:       tsOptions,
-    optgroups:     tsOptgroups,
-    optgroupField: 'optgroup',
-    labelField:    'text',
-    valueField:    'value',
-    searchField:   'text',
-    items:         ['Ratón espinoso PrP'],
-    placeholder:   'Buscar secuencia PrP…',
-    create:        false,
-    allowEmptyOption: false
-});
-
-tomSelect.on('change', updateSeqPreview);
-updateSeqPreview();
+let tomSelect;
+try {
+    tomSelect = new TomSelect('#refPrP', {
+        options:          tsOptions,
+        optgroups:        tsOptgroups,
+        optgroupField:    'optgroup',
+        labelField:       'text',
+        valueField:       'value',
+        searchField:      'text',
+        placeholder:      'Buscar secuencia PrP…',
+        create:           false,
+        allowEmptyOption: false,
+        render: {
+            no_results: () => '<div class="no-results">Sin resultados</div>'
+        }
+    });
+    // Seleccionar valor inicial de forma segura
+    const defaultKey = 'Rat\u00f3n espinoso PrP';
+    const firstKey   = tsOptions.length > 0 ? tsOptions[0].value : null;
+    tomSelect.setValue(tsOptions.find(o => o.value === defaultKey) ? defaultKey : firstKey);
+    tomSelect.on('change', updateSeqPreview);
+    updateSeqPreview();
+} catch(e) {
+    console.error('Tom-Select init error:', e);
+}
 
 function updateSeqPreview() {
+    if (!tomSelect) return;
     const name = tomSelect.getValue();
     const data = PRP_SEQUENCES[name];
     if (!data) return;
     const seq = data.sequence.replace(/\s/g, '');
-    document.getElementById('seqPreviewBases').textContent = seq.substring(0, 100) + '…';
+    document.getElementById('seqPreviewBases').textContent = seq.substring(0, 100) + '\u2026';
     document.getElementById('seqMeta').textContent =
         `Grupo: ${data.group}  |  Longitud total: ${seq.length} bp`;
 }
@@ -380,7 +395,7 @@ function showValidationError(msg) {
 function validate() {
     const base    = document.getElementById('rutaBase').value.trim();
     const species = document.getElementById('nombreEspecie').value.trim();
-    const ref     = tomSelect.getValue();
+    const ref     = tomSelect ? tomSelect.getValue() : document.getElementById('refPrP').value;
     const salida  = document.getElementById('rutaSalida').value.trim();
     if (!base)    { showValidationError('La ruta base de trabajo es obligatoria.'); return false; }
     if (!species) { showValidationError('El nombre de la especie es obligatorio.'); return false; }
@@ -396,8 +411,8 @@ let currentES = null;
 async function startAnalysis() {
     if (!validate()) return;
 
-    const refName     = tomSelect.getValue();
-    const refSequence = PRP_SEQUENCES[refName].sequence.replace(/\s/g, '');
+    const refName     = tomSelect ? tomSelect.getValue() : document.getElementById('refPrP').value;
+    const refSequence = (PRP_SEQUENCES[refName]?.sequence || '').replace(/\s/g, '');
 
     const payload = {
         rutaBase:      document.getElementById('rutaBase').value.trim(),
