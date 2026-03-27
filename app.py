@@ -3,6 +3,8 @@ import io
 import re
 import base64
 import json
+import tempfile
+import shutil
 from collections import Counter
 import matplotlib
 matplotlib.use('Agg')
@@ -12,6 +14,7 @@ from sequences import PRP_SEQUENCES, GROUPS_ORDER
 from blast_runner import start_job, get_job_queue, cleanup_job
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10 GB
 
 
 # ── Kaplan-Meier helpers ───────────────────────────────────────────
@@ -142,7 +145,34 @@ def prnp_orthominer():
 
 @app.route('/prnp-orthominer/start', methods=['POST'])
 def prnp_start():
-    data = request.get_json(force=True) or {}
+    # ── Modo subida de archivos (multipart/form-data) ──
+    if request.files:
+        species      = request.form.get('nombreEspecie', '').strip()
+        ref_name     = request.form.get('refName', '').strip()
+        ref_sequence = request.form.get('refSequence', '').strip()
+
+        if not all([species, ref_name, ref_sequence]):
+            return jsonify({'error': 'Faltan parámetros obligatorios.'}), 400
+
+        gz_files = [f for f in request.files.getlist('genomeFiles')
+                    if f.filename.endswith('.gz')]
+        if not gz_files:
+            return jsonify({'error': 'No se encontraron archivos .gz entre los subidos.'}), 400
+
+        work_dir    = tempfile.mkdtemp(prefix='prnp_')
+        species_dir = os.path.join(work_dir, species)
+        os.makedirs(species_dir, exist_ok=True)
+
+        for f in gz_files:
+            filename = os.path.basename(f.filename)
+            f.save(os.path.join(species_dir, filename))
+
+        job_id = start_job(work_dir, species, ref_name, ref_sequence,
+                           work_dir, cleanup_dir=work_dir)
+        return jsonify({'job_id': job_id})
+
+    # ── Modo ruta local (JSON) — para uso local ──
+    data         = request.get_json(force=True) or {}
     base_path    = data.get('rutaBase', '').strip()
     species      = data.get('nombreEspecie', '').strip()
     ref_name     = data.get('refName', '').strip()

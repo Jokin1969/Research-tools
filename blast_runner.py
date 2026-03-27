@@ -474,8 +474,13 @@ def _pipeline_generator(base_path, species, ref_name, ref_sequence, output_path)
 # API pública: jobs asíncronos con cola
 # ---------------------------------------------------------------------------
 
-def start_job(base_path, species, ref_name, ref_sequence, output_path) -> str:
-    """Lanza el pipeline en un hilo background y devuelve el job_id."""
+def start_job(base_path, species, ref_name, ref_sequence, output_path,
+              cleanup_dir=None) -> str:
+    """Lanza el pipeline en un hilo background y devuelve el job_id.
+
+    Si se pasa cleanup_dir, ese directorio se borra automáticamente
+    al finalizar el pipeline (usado en modo subida de archivos).
+    """
     job_id = uuid.uuid4().hex[:8]
     q: queue.Queue = queue.Queue()
     _jobs[job_id] = q
@@ -490,6 +495,8 @@ def start_job(base_path, species, ref_name, ref_sequence, output_path) -> str:
             q.put({'type': 'error', 'message': str(e)})
         finally:
             q.put(None)   # sentinel — fin del stream
+            if cleanup_dir and os.path.isdir(cleanup_dir):
+                shutil.rmtree(cleanup_dir, ignore_errors=True)
 
     threading.Thread(target=worker, daemon=True).start()
     return job_id
