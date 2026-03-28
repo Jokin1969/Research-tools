@@ -324,8 +324,22 @@ def prnp_export_docx():
             tbl.rows[i].cells[0].text = label
             tbl.rows[i].cells[1].text = taxonomy.get(key, '—')
 
+    GREEN = RGBColor(0x27, 0x67, 0x49)   # secuencia con ORF
+    RED   = RGBColor(0xc0, 0x39, 0x2b)   # secuencia sin ORF
+
     for idx, res in enumerate(results, 1):
-        doc.add_heading(f'Resultado {idx}' + (f' — {res.get("genome_file","")}' if res.get('genome_file') else ''), level=2)
+        # Título de sección: especie directamente (sin "Resultado #")
+        res_species = res.get('species', '') or species
+        h2 = doc.add_heading(res_species, level=2)
+        if h2.runs:
+            h2.runs[0].font.color.rgb = RGBColor(0x6b, 0x46, 0xc1)
+
+        # Determine ORF strand to decide color coding
+        orf = res.get('orf')
+        orf_on_direct = orf and orf.get('strand') == '+'
+        # direct = green when ORF is on direct strand; red when on RC
+        direct_color = GREEN if (orf_on_direct or not orf) else RED
+        rc_color     = RED   if (orf_on_direct or not orf) else GREEN
 
         # Coordenadas
         if res.get('coords_summary'):
@@ -343,19 +357,58 @@ def prnp_export_docx():
             run.font.name = 'Courier New'
             run.font.size = Pt(9)
 
-        # Secuencia directa
+        # Secuencia directa (título coloreado según ORF)
         if res.get('fasta_direct'):
-            doc.add_heading('Secuencia extendida (directa)', level=3)
+            h = doc.add_heading('Secuencia extendida (directa)', level=3)
+            if h.runs:
+                h.runs[0].font.color.rgb = direct_color
             p = doc.add_paragraph()
             run = p.add_run(res['fasta_direct'])
             run.font.name = 'Courier New'
             run.font.size = Pt(8)
 
-        # Secuencia RC
+        # Secuencia RC (título coloreado según ORF)
         if res.get('fasta_rc'):
-            doc.add_heading('Secuencia extendida (reversa complementaria)', level=3)
+            h = doc.add_heading('Secuencia extendida (reversa complementaria)', level=3)
+            if h.runs:
+                h.runs[0].font.color.rgb = rc_color
             p = doc.add_paragraph()
             run = p.add_run(res['fasta_rc'])
+            run.font.name = 'Courier New'
+            run.font.size = Pt(8)
+
+        # ORF más larga
+        if orf:
+            strand_label = '+' if orf.get('strand') == '+' else '−'
+            h = doc.add_heading('ORF más larga encontrada', level=3)
+            if h.runs:
+                h.runs[0].font.color.rgb = GREEN if orf_on_direct else RED
+
+            # Hebra y marco
+            p = doc.add_paragraph()
+            run = p.add_run(f"{strand_label} hebra, marco {orf.get('frame', '?')}")
+            run.bold = True
+
+            # Posición y longitud
+            p = doc.add_paragraph()
+            run = p.add_run(
+                f"Posición: {orf.get('start', '?')}–{orf.get('end', '?')}"
+                f"  |  Longitud: {orf.get('len', 0)} nt"
+                f" ({orf.get('len', 0) // 3} aa)"
+            )
+            run.font.size = Pt(9)
+
+            # Secuencia nucleotídica
+            doc.add_heading('Secuencia nt', level=4)
+            p = doc.add_paragraph()
+            run = p.add_run(orf.get('nt_seq', ''))
+            run.font.name = 'Courier New'
+            run.font.size = Pt(8)
+
+            # Proteína
+            doc.add_heading('Proteína traducida', level=4)
+            p = doc.add_paragraph()
+            run = p.add_run(orf.get('protein', ''))
             run.font.name = 'Courier New'
             run.font.size = Pt(8)
 

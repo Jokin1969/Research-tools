@@ -1302,9 +1302,28 @@ async function exportWord() {
     const results  = [];
     cards.forEach(card => {
         const n = card.id.replace('result-','');
-        const seqEl  = document.getElementById('seq-'  + n);
-        const rcActive = card.dataset.rcActive === '1';
         const directFasta = card.dataset.fastaContent || '';
+
+        // Compute ORF from direct sequence (always run on direct strand)
+        let orfData = null;
+        if (directFasta) {
+            const seqLines = directFasta.split('\n').filter(l => !l.startsWith('>'));
+            const seqBases = seqLines.join('');
+            const orf = findLongestORF(seqBases);
+            if (orf) {
+                orfData = {
+                    strand:  orf.strand,
+                    frame:   orf.frame,
+                    start:   orf.start,
+                    end:     orf.end,
+                    len:     orf.len,
+                    nt_seq:  orf.seq,
+                    protein: translateDNA(orf.seq)
+                };
+            }
+        }
+
+        // Build RC fasta
         let rcFasta = '';
         if (directFasta) {
             const lines = directFasta.split('\n');
@@ -1315,12 +1334,13 @@ async function exportWord() {
             rcFasta = hdr + '\n' + rcLines.join('\n') + '\n';
         }
         results.push({
-            genome_file:    card.dataset.species || '',
+            species:        card.dataset.species || '',
             ref_name:       card.dataset.refName || '',
             coords_summary: card.dataset.coordsSummary || '',
             genomic_info:   card.dataset.genomicInfo || '',
             fasta_direct:   directFasta,
-            fasta_rc:       rcFasta
+            fasta_rc:       rcFasta,
+            orf:            orfData
         });
     });
 
